@@ -1,15 +1,14 @@
-//source code by @hiyaok programmer
-//telegram @hiyaok
-//harga script Rp.600.000+
+// Source code by @hiyaok programmer
+// Telegram @hiyaok
+// Harga script Rp.600.000+
 
-//modules
+// Modules
 const { Telegraf } = require('telegraf');
-const fs = require('fs'); // Gunakan fs/promises di sini
+const fs = require('fs');
 const path = require('path');
 const fetch = require('node-fetch');
 const XLSX = require('xlsx');
 const stringSimilarity = require('string-similarity');
-
 
 const bot = new Telegraf('7406919687:AAGNLXrAWlNgN1_nz6MWevsBXvSM5klIQBI');
 const adminId = '5988451717';  // Ganti dengan ID admin bot
@@ -61,7 +60,7 @@ const isPremiumOrAdmin = (ctx) => {
 // Fungsi untuk mengirim pesan ke pengguna yang tidak memiliki akses
 const sendNoAccessMessage = (ctx) => {
   const username = ctx.from.username || ctx.from.first_name;
-  const message = `Halo @${username} Saya adalah Bot Convert File By [hiyaok](https://t.me/hiyaok)\n\nUntuk dapat akses fitur bot silahkan hubungi @hiyaok`;
+  const message = `Halo @${username}, Saya adalah Bot Convert File By [hiyaok](https://t.me/hiyaok)\n\nUntuk dapat akses fitur bot silahkan hubungi @hiyaok`;
   ctx.replyWithMarkdown(message, {
     reply_markup: {
       inline_keyboard: [
@@ -86,17 +85,74 @@ bot.start((ctx) => {
   ctx.reply('🖐🏻 Welcome! Please choose a mode:\n1. TXT to VCF\n2. VCF to TXT\n3. XLSX to VCF\n4. VCF to XLSX\n\nReply with the number of your choice.');
 });
 
+// Admin commands
+bot.command('premium', (ctx) => {
+  if (ctx.from.id.toString() !== adminId) {
+    return;
+  }
+
+  const args = ctx.message.text.split(' ').slice(1);
+  if (args.length < 2) {
+    ctx.reply('Usage: /premium <user_id> <days>');
+    return;
+  }
+
+  const userId = args[0];
+  const days = parseInt(args[1], 10);
+  const expiryDate = new Date();
+  expiryDate.setDate(expiryDate.getDate() + days);
+
+  const premiumUsers = loadPremiumUsers();
+  premiumUsers[userId] = { expiryDate: expiryDate.toISOString() };
+  savePremiumUsers(premiumUsers);
+
+  ctx.reply(`User ${userId} has been granted premium access for ${days} days.`);
+  ctx.telegram.sendMessage(userId, `You have been granted premium access for ${days} days.`);
+});
+
+bot.command('delpremium', (ctx) => {
+  if (ctx.from.id.toString() !== adminId) {
+    return;
+  }
+
+  const args = ctx.message.text.split(' ').slice(1);
+  if (args.length < 1) {
+    ctx.reply('Usage: /delpremium <user_id>');
+    return;
+  }
+
+  const userId = args[0];
+  const premiumUsers = loadPremiumUsers();
+  delete premiumUsers[userId];
+  savePremiumUsers(premiumUsers);
+
+  ctx.reply(`User ${userId} has been removed from premium access.`);
+});
+
+bot.command('listprem', (ctx) => {
+  if (ctx.from.id.toString() !== adminId) {
+    return;
+  }
+
+  const premiumUsers = loadPremiumUsers();
+  const now = new Date();
+  const list = Object.entries(premiumUsers).map(([userId, { expiryDate }]) => {
+    const expiry = new Date(expiryDate);
+    const remainingDays = Math.ceil((expiry - now) / (1000 * 60 * 60 * 24));
+    return `User ID: ${userId}, Expiry Date: ${expiryDate}, Remaining Days: ${remainingDays}`;
+  }).join('\n');
+
+  ctx.reply(`Premium Users:\n${list}`);
+});
+
 // Handler untuk pesan teks
 bot.on('text', async (ctx) => {
   if (!isPremiumOrAdmin(ctx)) {
     sendNoAccessMessage(ctx);
     return;
   }
-  // Handle admin commands
-  if (text.startsWith('/premium') || text.startsWith('/delpremium') || text.startsWith('/listprem')) {
-    handleAdminCommands(ctx);
-    return;
-  }
+  const text = ctx.message.text.trim();
+  if (text.startsWith('/')) return; 
 
   const userId = ctx.from.id;
   const session = loadUserSession(userId);
@@ -116,90 +172,6 @@ bot.on('text', async (ctx) => {
   ctx.reply('Please send a file to convert 📂');
 });
 
-// Handler for admin commands
-const handleAdminCommands = (ctx) => {
-  const text = ctx.message.text.trim();
-  const [command, ...args] = text.split(' ');
-
-  if (ctx.from.id.toString() !== adminId) {
-    ctx.reply('Anda tidak memiliki izin untuk menggunakan perintah ini.');
-    return;
-  }
-
-  switch (command) {
-    case '/premium':
-      addPremiumUser(ctx, args);
-      break;
-    case '/delpremium':
-      removePremiumUser(ctx, args);
-      break;
-    case '/listprem':
-      listPremiumUsers(ctx);
-      break;
-    default:
-      ctx.reply('Perintah tidak dikenal.');
-  }
-};
-
-const addPremiumUser = (ctx, args) => {
-  if (args.length < 2) {
-    ctx.reply('Format perintah salah. Gunakan: /premium <userId> <hari>');
-    return;
-  }
-
-  const [targetUserId, days] = args;
-  const expiryDate = new Date();
-  expiryDate.setDate(expiryDate.getDate() + parseInt(days));
-
-  const premiumUsers = loadPremiumUsers();
-  premiumUsers[targetUserId] = {
-    expiryDate: expiryDate.toISOString(),
-    addedBy: ctx.from.id.toString()
-  };
-  savePremiumUsers(premiumUsers);
-
-  ctx.telegram.sendMessage(targetUserId, `Selamat! Anda telah menjadi pengguna premium selama ${days} hari.`);
-  ctx.reply(`Pengguna ${targetUserId} telah ditambahkan sebagai pengguna premium selama ${days} hari.`);
-};
-
-const removePremiumUser = (ctx, args) => {
-  if (args.length < 1) {
-    ctx.reply('Format perintah salah. Gunakan: /delpremium <userId>');
-    return;
-  }
-
-  const [targetUserId] = args;
-
-  const premiumUsers = loadPremiumUsers();
-  if (premiumUsers[targetUserId]) {
-    delete premiumUsers[targetUserId];
-    savePremiumUsers(premiumUsers);
-    ctx.telegram.sendMessage(targetUserId, 'Status premium Anda telah dihapus.');
-    ctx.reply(`Pengguna ${targetUserId} telah dihapus dari daftar pengguna premium.`);
-  } else {
-    ctx.reply(`Pengguna ${targetUserId} tidak ditemukan dalam daftar pengguna premium.`);
-  }
-};
-
-const listPremiumUsers = (ctx) => {
-  const premiumUsers = loadPremiumUsers();
-  const now = new Date();
-  let message = 'Daftar Pengguna Premium:\n\n';
-
-  Object.keys(premiumUsers).forEach((key, index) => {
-    const user = premiumUsers[key];
-    const expiryDate = new Date(user.expiryDate);
-    const remainingDays = Math.ceil((expiryDate - now) / (1000 * 60 * 60 * 24));
-    message += `${index + 1}. ID: ${key}, Berakhir: ${expiryDate.toLocaleDateString()}, Sisa Hari: ${remainingDays}\n`;
-  });
-
-  if (Object.keys(premiumUsers).length === 0) {
-    message = 'Tidak ada pengguna premium saat ini.';
-  }
-
-  ctx.reply(message);
-};
-
 bot.on('document', async (ctx) => {
   if (!isPremiumOrAdmin(ctx)) {
     sendNoAccessMessage(ctx);
@@ -213,22 +185,16 @@ bot.on('document', async (ctx) => {
     ctx.reply('Please choose a mode first ❗');
     return;
   }
-  
- const fileType = ctx.message.document.mime_type;
+
+  const fileType = ctx.message.document.mime_type;
   let validFile = false;
 
   switch (session.mode) {
     case '1':
       if (fileType === 'text/plain') validFile = true;
       break;
-    case '2':
-      if (fileType === 'text/vcard') validFile = true;
-      break;
     case '3':
       if (fileType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet') validFile = true;
-      break;
-    case '4':
-      if (fileType === 'text/vcard') validFile = true;
       break;
   }
 
@@ -293,40 +259,42 @@ const handleVcfToTxt = (buffer, ctx) => {
   const content = buffer.toString('utf-8');
   const contacts = parseVcf(content);
   const outputFile = createTxtFile(contacts);
-  ctx.replyWithDocument({ source: Buffer.from(outputFile), filename: '${baseName}_${Math.floor(i / limit) + 1}.txt' });
+  ctx.replyWithDocument({ source: Buffer.from(outputFile), filename: 'output.txt' });
 };
 
 const handleXlsxToVcf = (buffer, ctx) => {
-  const workbook = XLSX.read(buffer, { type: 'buffer' });
-  const contacts = parseXlsx(workbook);
-  const outputFile = createVcfFile(contacts);
-  ctx.replyWithDocument({ source: Buffer.from(outputFile), filename: 'ConvertDone.vcf' });
+  const workbook = XLSX.read(buffer);
+  const sheet = workbook.Sheets[workbook.SheetNames[0]];
+  const jsonData = XLSX.utils.sheet_to_json(sheet);
+  const contacts = jsonData.map(row => ({ name: row.Name, phone: row.Phone }));
+  const vcfFile = createVcfFile(contacts);
+  ctx.replyWithDocument({ source: Buffer.from(vcfFile), filename: 'output.vcf' });
 };
 
 const handleVcfToXlsx = (buffer, ctx) => {
   const content = buffer.toString('utf-8');
   const contacts = parseVcf(content);
-  const workbook = createXlsx(contacts);
-  const outputBuffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
-
-  ctx.replyWithDocument({ source: outputBuffer, filename: 'ConvertDone.xlsx' });
+  const sheet = XLSX.utils.json_to_sheet(contacts);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, sheet, 'Contacts');
+  const xlsxBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'buffer' });
+  ctx.replyWithDocument({ source: xlsxBuffer, filename: 'output.xlsx' });
 };
 
 const parseSections = (content) => {
   const sections = [];
   let currentSection = null;
+  const lines = content.split('\n');
 
-  content.split('\n').forEach(line => {
-    line = line.trim();
-    if (!line) return;
-
-    if (isNaN(line)) {
+  lines.forEach(line => {
+    const sectionMatch = line.match(/\[(.*?)\]/);
+    if (sectionMatch) {
       if (currentSection) {
         sections.push(currentSection);
       }
-      currentSection = { name: line, contacts: [] };
+      currentSection = { name: sectionMatch[1], contacts: [] };
     } else if (currentSection) {
-      currentSection.contacts.push(line.startsWith('+') ? line : `+${line}`);
+      currentSection.contacts.push(line.trim());
     }
   });
 
@@ -338,49 +306,35 @@ const parseSections = (content) => {
 };
 
 const getTargetSections = (sections, targetNames) => {
-  return sections.filter(section => {
-    const sectionName = section.name.toLowerCase();
-    return targetNames.some(targetName => {
-      const targetLower = targetName.toLowerCase();
-      return sectionName.includes(targetLower) || stringSimilarity.compareTwoStrings(sectionName, targetLower) > 0.8;
-    });
-  });
+  return sections.filter(section => targetNames.some(name => 
+    stringSimilarity.compareTwoStrings(section.name, name) > 0.8
+  ));
 };
 
-const splitContactsIntoVcfFiles = (contacts, baseName, limit) => {
+const splitContactsIntoVcfFiles = (contacts, outputFileName, contactLimit) => {
   const outputFiles = [];
-
-  for (let i = 0; i < contacts.length; i += limit) {
-    const chunk = contacts.slice(i, i + limit);
-    const chunkVcf = chunk.map((contact, index) => `BEGIN:VCARD\nVERSION:3.0\nFN:${contact.name}_${i + index + 1}\nTEL;TYPE=CELL:${contact.phone}\nEND:VCARD`).join('\n');
-
-    outputFiles.push({ filename: `${baseName}_${Math.floor(i / limit) + 1}.vcf`, content: chunkVcf });
+  for (let i = 0; i < contacts.length; i += contactLimit) {
+    const chunk = contacts.slice(i, i + contactLimit);
+    const vcfContent = createVcfFile(chunk);
+    outputFiles.push({ content: vcfContent, filename: `${outputFileName}_${Math.floor(i / contactLimit) + 1}.vcf` });
   }
-
   return outputFiles;
 };
 
-const createTxtFile = (contacts) => {
-  return contacts.map(contact => `${contact.name} ${contact.phone}`).join('\n');
-};
-
-const parseVcf = (content) => {
+const parseVcf = (vcfContent) => {
   const contacts = [];
-  const lines = content.split('\n');
-  let currentContact = null;
+  const lines = vcfContent.split('\n');
+  let currentContact = {};
 
   lines.forEach(line => {
     if (line.startsWith('BEGIN:VCARD')) {
       currentContact = {};
     } else if (line.startsWith('FN:')) {
       currentContact.name = line.replace('FN:', '').trim();
-    } else if (line.startsWith('TEL;TYPE=CELL:')) {
-      currentContact.phone = line.replace('TEL;TYPE=CELL:', '').trim();
+    } else if (line.startsWith('TEL:')) {
+      currentContact.phone = line.replace('TEL:', '').trim();
     } else if (line.startsWith('END:VCARD')) {
-      if (currentContact) {
-        contacts.push(currentContact);
-      }
-      currentContact = null;
+      contacts.push(currentContact);
     }
   });
 
@@ -388,23 +342,13 @@ const parseVcf = (content) => {
 };
 
 const createVcfFile = (contacts) => {
-  return contacts.map(contact => `BEGIN:VCARD\nVERSION:3.0\nFN:${contact.name}\nTEL;TYPE=CELL:${contact.phone}\nEND:VCARD`).join('\n');
+  return contacts.map(contact => {
+    return `BEGIN:VCARD\nVERSION:3.0\nFN:${contact.name}\nTEL:${contact.phone}\nEND:VCARD`;
+  }).join('\n');
 };
 
-const parseXlsx = (workbook) => {
-  const sheetName = workbook.SheetNames[0];
-  const sheet = workbook.Sheets[sheetName];
-  return XLSX.utils.sheet_to_json(sheet).map(row => ({
-    name: row.Name || row.name || row[0],
-    phone: row.Phone || row.phone || row[1]
-  }));
+const createTxtFile = (contacts) => {
+  return contacts.map(contact => `${contact.name} ${contact.phone}`).join('\n');
 };
 
-const createXlsx = (contacts) => {
-  const sheet = XLSX.utils.json_to_sheet(contacts);
-  const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, sheet, 'Contacts');
-  return workbook;
-};
-// Start bot polling
 bot.launch();
