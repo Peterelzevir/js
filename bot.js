@@ -4,7 +4,7 @@
 
 //modules
 const { Telegraf } = require('telegraf');
-const fs = require('fs');
+const { readFile } = require('fs/promises'); // Gunakan fs/promises di sini
 const path = require('path');
 const fetch = require('node-fetch');
 const XLSX = require('xlsx');
