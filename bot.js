@@ -1,19 +1,14 @@
-// Source code by @hiyaok programmer
-// Telegram @hiyaok
-// Harga script Rp.600.000+
+//source code by @hiyaok programmer
+//telegram @hiyaok
+//harga script Rp.600.000+
 
-// Modules
+//modules
 const { Telegraf } = require('telegraf');
 const fs = require('fs');
 const path = require('path');
+const fetch = require('node-fetch');
 const XLSX = require('xlsx');
 const stringSimilarity = require('string-similarity');
-
-// Dynamic import for node-fetch
-let fetch;
-(async () => {
-  fetch = await import('node-fetch').then(module => module.default);
-})();
 
 const bot = new Telegraf('7406919687:AAGNLXrAWlNgN1_nz6MWevsBXvSM5klIQBI');
 const adminId = '5988451717';  // Ganti dengan ID admin bot
@@ -65,7 +60,7 @@ const isPremiumOrAdmin = (ctx) => {
 // Fungsi untuk mengirim pesan ke pengguna yang tidak memiliki akses
 const sendNoAccessMessage = (ctx) => {
   const username = ctx.from.username || ctx.from.first_name;
-  const message = `Halo @${username}, Saya adalah Bot Convert File By [hiyaok](https://t.me/hiyaok)\n\nUntuk dapat akses fitur bot silahkan hubungi @hiyaok`;
+  const message = `Halo @${username} Saya adalah Bot Convert File By [hiyaok](https://t.me/hiyaok)\n\nUntuk dapat akses fitur bot silahkan hubungi @hiyaok`;
   ctx.replyWithMarkdown(message, {
     reply_markup: {
       inline_keyboard: [
@@ -198,8 +193,14 @@ bot.on('document', async (ctx) => {
     case '1':
       if (fileType === 'text/plain') validFile = true;
       break;
+    case '2':
+      if (ctx.message.document.file_name.endsWith('.vcf')) validFile = true;
+      break;
     case '3':
       if (fileType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet') validFile = true;
+      break;
+    case '4':
+      if (ctx.message.document.file_name.endsWith('.vcf')) validFile = true;
       break;
   }
 
@@ -260,116 +261,122 @@ const handleTxtToVcf = (buffer, caption, ctx) => {
   });
 };
 
-const handleVcfToTxt = (buffer, ctx) => {
-  const content = buffer.toString('utf-8');
-  const contacts = parseVcf(content);
-  const txtContent = formatContactsAsTxt(contacts);
-  ctx.replyWithDocument({ source: Buffer.from(txtContent), filename: 'contacts.txt' });
-};
-
-const handleXlsxToVcf = (buffer, ctx) => {
-  const workbook = XLSX.read(buffer, { type: 'buffer' });
-  const sheet = workbook.Sheets[workbook.SheetNames[0]];
-  const data = XLSX.utils.sheet_to_json(sheet, { header: 1 });
-
-  const vcfContent = data.map(row => formatContactAsVcf(row)).join('\n');
-  ctx.replyWithDocument({ source: Buffer.from(vcfContent), filename: 'contacts.vcf' });
-};
-
-const handleVcfToXlsx = (buffer, ctx) => {
-  const content = buffer.toString('utf-8');
-  const contacts = parseVcf(content);
-  const worksheet = XLSX.utils.json_to_sheet(contacts);
-  const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, 'Contacts');
-  
-  const xlsxBuffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
-  ctx.replyWithDocument({ source: xlsxBuffer, filename: 'contacts.xlsx' });
-};
-
 const parseSections = (content) => {
-  const lines = content.split('\n');
   const sections = [];
   let currentSection = null;
 
-  lines.forEach(line => {
-    const match = line.match(/^(.*)\s*\[(.*)\]/);
-    if (match) {
-      if (currentSection) sections.push(currentSection);
-      currentSection = { name: match[1].trim(), contacts: [] };
+  content.split('\n').forEach(line => {
+    line = line.trim();
+    if (!line) return;
+
+    if (isNaN(line)) {
+      if (currentSection) {
+        sections.push(currentSection);
+      }
+      currentSection = { name: line, contacts: [] };
     } else if (currentSection) {
-      currentSection.contacts.push(line.trim());
+      currentSection.contacts.push(line.startsWith('+') ? line : `+${line}`);
     }
   });
 
-  if (currentSection) sections.push(currentSection);
+  if (currentSection) {
+    sections.push(currentSection);
+  }
+
   return sections;
 };
 
 const getTargetSections = (sections, targetNames) => {
-  return targetNames.map(name => {
-    const matches = stringSimilarity.findBestMatch(name.trim(), sections.map(s => s.name)).ratings;
-    matches.sort((a, b) => b.rating - a.rating);
-    return matches[0].rating > 0.6 ? sections.find(s => s.name === matches[0].target) : null;
-  }).filter(Boolean);
+  return sections.filter(section => {
+    const sectionName = section.name.toLowerCase();
+    return targetNames.some(targetName => {
+      const targetLower = targetName.toLowerCase();
+      return sectionName.includes(targetLower) || stringSimilarity.compareTwoStrings(sectionName, targetLower) > 0.8;
+    });
+  });
 };
 
 const splitContactsIntoVcfFiles = (contacts, baseName, limit) => {
-  const files = [];
-  let currentFile = { filename: `${baseName}_1.vcf`, content: '' };
-  contacts.forEach((contact, index) => {
-    if (index > 0 && index % limit === 0) {
-      files.push(currentFile);
-      currentFile = { filename: `${baseName}_${files.length + 1}.vcf`, content: '' };
-    }
-    currentFile.content += `BEGIN:VCARD\nVERSION:3.0\nFN:${contact.name}\nTEL:${contact.phone}\nEND:VCARD\n`;
-  });
-  files.push(currentFile);
-  return files;
+  const outputFiles = [];
+
+  for (let i = 0; i < contacts.length; i += limit) {
+    const chunk = contacts.slice(i, i + limit);
+    const chunkVcf = chunk.map((contact, index) => `BEGIN:VCARD\nVERSION:3.0\nFN:${contact.name}_${i + index + 1}\nTEL;TYPE=CELL:${contact.phone}\nEND:VCARD`).join('\n');
+
+    outputFiles.push({ filename: `${baseName}_${Math.floor(i / limit) + 1}.vcf`, content: chunkVcf });
+  }
+
+  return outputFiles;
+};
+
+const handleVcfToTxt = (buffer, ctx) => {
+  const content = buffer.toString('utf-8');
+  const contacts = parseVcf(content);
+  const outputFile = createTxtFile(contacts);
+  ctx.replyWithDocument({ source: Buffer.from(outputFile), filename: 'DoneConvert.txt' });
+};
+
+const createTxtFile = (contacts) => {
+  return contacts.map(contact => `${contact.name}\n${contact.phone}`).join('\n');
+};
+
+const handleXlsxToVcf = (buffer, ctx) => {
+  const workbook = XLSX.read(buffer, { type: 'buffer' });
+  const contacts = parseXlsx(workbook);
+  const outputFile = createVcfFile(contacts);
+  ctx.replyWithDocument({ source: Buffer.from(outputFile), filename: 'ConvertDone.vcf' });
 };
 
 const parseVcf = (content) => {
-  const lines = content.split('\n');
   const contacts = [];
-  let currentContact = {};
+  const lines = content.split('\n');
+  let currentContact = null;
 
   lines.forEach(line => {
-    if (line.startsWith('FN:')) {
-      currentContact.name = line.replace('FN:', '').trim();
-    } else if (line.startsWith('TEL:')) {
-      currentContact.phone = line.replace('TEL:', '').trim();
-    } else if (line === 'END:VCARD') {
-      contacts.push(currentContact);
+    if (line.startsWith('BEGIN:VCARD')) {
       currentContact = {};
+    } else if (line.startsWith('FN:')) {
+      currentContact.name = line.replace('FN:', '').trim();
+    } else if (line.startsWith('TEL;TYPE=CELL:')) {
+      currentContact.phone = line.replace('TEL;TYPE=CELL:', '').trim();
+    } else if (line.startsWith('END:VCARD')) {
+      if (currentContact) {
+        contacts.push(currentContact);
+      }
+      currentContact = null;
     }
   });
 
   return contacts;
 };
 
-const formatContactsAsTxt = (contacts) => {
-  const sections = {};
-  contacts.forEach(contact => {
-    const section = contact.name.split(' ')[0];  // Assuming section name is the first word of the name
-    if (!sections[section]) sections[section] = [];
-    sections[section].push(contact.phone);
-  });
+const handleVcfToXlsx = (buffer, ctx) => {
+  const content = buffer.toString('utf-8');
+  const contacts = parseVcf(content);
+  const workbook = createXlsx(contacts);
+  const outputBuffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
 
-  let content = '';
-  Object.entries(sections).forEach(([section, phones]) => {
-    content += `${section}\n`;
-    phones.forEach(phone => {
-      content += `${phone}\n`;
-    });
-  });
-
-  return content;
+  ctx.replyWithDocument({ source: outputBuffer, filename: 'ConvertDone.xlsx' });
 };
 
-const formatContactAsVcf = (row) => {
-  const [name, phone] = row;
-  return `BEGIN:VCARD\nVERSION:3.0\nFN:${name}\nTEL:${phone}\nEND:VCARD\n`;
+const createVcfFile = (contacts) => {
+  return contacts.map(contact => `BEGIN:VCARD\nVERSION:3.0\nFN:${contact.name}\nTEL;TYPE=CELL:${contact.phone}\nEND:VCARD`).join('\n');
+};
+
+const parseXlsx = (workbook) => {
+  const sheetName = workbook.SheetNames[0];
+  const sheet = workbook.Sheets[sheetName];
+  return XLSX.utils.sheet_to_json(sheet).map(row => ({
+    name: row.Name || row.name || row[0],
+    phone: row.Phone || row.phone || row[1]
+  }));
+};
+
+const createXlsx = (contacts) => {
+  const sheet = XLSX.utils.json_to_sheet(contacts);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, sheet, 'Contacts');
+  return workbook;
 };
 
 bot.launch();
-console.log('Bot started');
