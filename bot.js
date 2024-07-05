@@ -4,7 +4,7 @@
 
 //modules
 const { Telegraf } = require('telegraf');
-const { readFile } = require('fs/promises'); // Gunakan fs/promises di sini
+const fs = require('fs'); // Gunakan fs/promises di sini
 const path = require('path');
 const fetch = require('node-fetch');
 const XLSX = require('xlsx');
@@ -92,6 +92,11 @@ bot.on('text', async (ctx) => {
     sendNoAccessMessage(ctx);
     return;
   }
+  // Handle admin commands
+  if (text.startsWith('/premium') || text.startsWith('/delpremium') || text.startsWith('/listprem')) {
+    handleAdminCommands(ctx);
+    return;
+  }
 
   const userId = ctx.from.id;
   const session = loadUserSession(userId);
@@ -110,6 +115,90 @@ bot.on('text', async (ctx) => {
 
   ctx.reply('Please send a file to convert 📂');
 });
+
+// Handler for admin commands
+const handleAdminCommands = (ctx) => {
+  const text = ctx.message.text.trim();
+  const [command, ...args] = text.split(' ');
+
+  if (ctx.from.id.toString() !== adminId) {
+    ctx.reply('Anda tidak memiliki izin untuk menggunakan perintah ini.');
+    return;
+  }
+
+  switch (command) {
+    case '/premium':
+      addPremiumUser(ctx, args);
+      break;
+    case '/delpremium':
+      removePremiumUser(ctx, args);
+      break;
+    case '/listprem':
+      listPremiumUsers(ctx);
+      break;
+    default:
+      ctx.reply('Perintah tidak dikenal.');
+  }
+};
+
+const addPremiumUser = (ctx, args) => {
+  if (args.length < 2) {
+    ctx.reply('Format perintah salah. Gunakan: /premium <userId> <hari>');
+    return;
+  }
+
+  const [targetUserId, days] = args;
+  const expiryDate = new Date();
+  expiryDate.setDate(expiryDate.getDate() + parseInt(days));
+
+  const premiumUsers = loadPremiumUsers();
+  premiumUsers[targetUserId] = {
+    expiryDate: expiryDate.toISOString(),
+    addedBy: ctx.from.id.toString()
+  };
+  savePremiumUsers(premiumUsers);
+
+  ctx.telegram.sendMessage(targetUserId, `Selamat! Anda telah menjadi pengguna premium selama ${days} hari.`);
+  ctx.reply(`Pengguna ${targetUserId} telah ditambahkan sebagai pengguna premium selama ${days} hari.`);
+};
+
+const removePremiumUser = (ctx, args) => {
+  if (args.length < 1) {
+    ctx.reply('Format perintah salah. Gunakan: /delpremium <userId>');
+    return;
+  }
+
+  const [targetUserId] = args;
+
+  const premiumUsers = loadPremiumUsers();
+  if (premiumUsers[targetUserId]) {
+    delete premiumUsers[targetUserId];
+    savePremiumUsers(premiumUsers);
+    ctx.telegram.sendMessage(targetUserId, 'Status premium Anda telah dihapus.');
+    ctx.reply(`Pengguna ${targetUserId} telah dihapus dari daftar pengguna premium.`);
+  } else {
+    ctx.reply(`Pengguna ${targetUserId} tidak ditemukan dalam daftar pengguna premium.`);
+  }
+};
+
+const listPremiumUsers = (ctx) => {
+  const premiumUsers = loadPremiumUsers();
+  const now = new Date();
+  let message = 'Daftar Pengguna Premium:\n\n';
+
+  Object.keys(premiumUsers).forEach((key, index) => {
+    const user = premiumUsers[key];
+    const expiryDate = new Date(user.expiryDate);
+    const remainingDays = Math.ceil((expiryDate - now) / (1000 * 60 * 60 * 24));
+    message += `${index + 1}. ID: ${key}, Berakhir: ${expiryDate.toLocaleDateString()}, Sisa Hari: ${remainingDays}\n`;
+  });
+
+  if (Object.keys(premiumUsers).length === 0) {
+    message = 'Tidak ada pengguna premium saat ini.';
+  }
+
+  ctx.reply(message);
+};
 
 bot.on('document', async (ctx) => {
   if (!isPremiumOrAdmin(ctx)) {
@@ -317,66 +406,5 @@ const createXlsx = (contacts) => {
   XLSX.utils.book_append_sheet(workbook, sheet, 'Contacts');
   return workbook;
 };
-
-// Admin commands
-bot.command('premium', (ctx) => {
-  if (ctx.from.id.toString() !== adminId) {
-    return;
-  }
-
-  const args = ctx.message.text.split(' ').slice(1);
-  if (args.length < 2) {
-    ctx.reply('Usage: /premium <user_id> <days>');
-    return;
-  }
-
-  const userId = args[0];
-  const days = parseInt(args[1]);
-  const expiryDate = new Date();
-  expiryDate.setDate(expiryDate.getDate() + days);
-
-  const premiumUsers = loadPremiumUsers();
-  premiumUsers[userId] = { expiryDate: expiryDate.toISOString() };
-  savePremiumUsers(premiumUsers);
-
-  ctx.reply(`User ${userId} has been granted premium access for ${days} days.`);
-  ctx.telegram.sendMessage(userId, `You have been granted premium access for ${days} days.`);
-});
-
-bot.command('delpremium', (ctx) => {
-  if (ctx.from.id.toString() !== adminId) {
-    return;
-  }
-
-  const args = ctx.message.text.split(' ').slice(1);
-  if (args.length < 1) {
-    ctx.reply('Usage: /delpremium <user_id>');
-    return;
-  }
-
-  const userId = args[0];
-  const premiumUsers = loadPremiumUsers();
-  delete premiumUsers[userId];
-  savePremiumUsers(premiumUsers);
-
-  ctx.reply(`User ${userId} has been removed from premium access.`);
-});
-
-bot.command('listprem', (ctx) => {
-  if (ctx.from.id.toString() !== adminId) {
-    return;
-  }
-
-  const premiumUsers = loadPremiumUsers();
-  const now = new Date();
-  const list = Object.entries(premiumUsers).map(([userId, { expiryDate }]) => {
-    const expiry = new Date(expiryDate);
-    const remainingDays = Math.ceil((expiry - now) / (1000 * 60 * 60 * 24));
-    return `User ID: ${userId}, Expiry Date: ${expiryDate}, Remaining Days: ${remainingDays}`;
-  }).join('\n');
-
-  ctx.reply(`Premium Users:\n${list}`);
-});
-
 // Start bot polling
 bot.launch();
