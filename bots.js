@@ -6,7 +6,7 @@
 const TelegramBot = require('node-telegram-bot-api');
 const fs = require('fs');
 const path = require('path');
-const fetch = require('node-fetch');
+const axios = require('axios');
 const XLSX = require('xlsx');
 const stringSimilarity = require('string-similarity');
 
