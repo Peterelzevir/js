@@ -3,12 +3,12 @@
 //harga script Rp.600.000+
 
 //modules
-const { Telegraf } = require('telegraf');
-const fs = require('fs');
-const path = require('path');
-const fetch = require('node-fetch');
-const XLSX = require('xlsx');
-const stringSimilarity = require('string-similarity');
+import TelegramBot from 'node-telegram-bot-api';
+import fs from 'fs';
+import path from 'path';
+import axios from 'axios';
+import XLSX from 'xlsx';
+import stringSimilarity from 'string-similarity';
 
 const bot = new Telegraf('7406919687:AAGNLXrAWlNgN1_nz6MWevsBXvSM5klIQBI');
 const adminId = '5988451717';  // Ganti dengan ID admin bot
