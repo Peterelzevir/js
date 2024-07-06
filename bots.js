@@ -16,7 +16,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 // initialize bot
-const bot = new TelegramBot('7406919687:AAGNLXrAWlNgN1_nz6MWevsBXvSM5klIQBI', { polling: true });
+const bot = new Telegraf('7406919687:AAGNLXrAWlNgN1_nz6MWevsBXvSM5klIQBI', { polling: true });
 const adminId = '5988451717'; // Ganti dengan ID admin bot
 
 // Fungsi untuk memuat sesi pengguna dari file JSON
