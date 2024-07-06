@@ -8,7 +8,7 @@ import { dirname } from 'path';
 import telegraf from 'telegraf';
 import fs from 'fs';
 import path from 'path';
-import axios from 'axios';
+import fetch from 'node-fetch';
 import XLSX from 'xlsx';
 import stringSimilarity from 'string-similarity';
 
