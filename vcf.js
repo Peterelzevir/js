@@ -15,7 +15,7 @@ import stringSimilarity from 'string-similarity';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-const bot = new Telegraf('7037157690:AAHIbuJux1MFtdXOwZhvqk-wtnHcSSqoWJM');
+const bot = new Telegraf('7037157690:AAEBfUdtXBgDi3VYRCvb52MIQg8U8W9K5Gg');
 const adminId = '5988451717';  // Ganti dengan ID admin bot
 
 // Fungsi untuk memuat sesi pengguna dari file JSON
