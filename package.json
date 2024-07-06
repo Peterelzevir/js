@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
+  "start": "node bot.js",
   "dependencies": {
     "abort-controller": "^3.0.0",
     "adler-32": "^1.3.1",
