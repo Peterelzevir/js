@@ -3,59 +3,66 @@
 //harga script Rp.600.000+
 
 //modules
-const { Telegraf } = require('telegraf');
-const fs = require('fs');
-const path = require('path');
-const fetch = require('node-fetch');
-const XLSX = require('xlsx');
-const stringSimilarity = require('string-similarity');
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
+import { Telegraf } from 'telegraf';
+import fs from 'fs';
+import path from 'path';
+import fetch from 'node-fetch';
+import XLSX from 'xlsx';
+import stringSimilarity from 'string-similarity';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 const bot = new Telegraf('7406919687:AAGNLXrAWlNgN1_nz6MWevsBXvSM5klIQBI');
-const adminId = '5988451717';  // Ganti dengan ID admin bot
+const adminId = '5988451717';  // Ganti dengan ID admin bot
 
 // Fungsi untuk memuat sesi pengguna dari file JSON
 const loadUserSession = (userId) => {
-  const filePath = path.join(__dirname, `session_${userId}.json`);
-  if (fs.existsSync(filePath)) {
-    return JSON.parse(fs.readFileSync(filePath));
-  }
-  return {};
+  const filePath = path.join(__dirname, `session_${userId}.json`);
+  if (fs.existsSync(filePath)) {
+    return JSON.parse(fs.readFileSync(filePath));
+  }
+  return {};
 };
 
 // Fungsi untuk menyimpan sesi pengguna ke file JSON
 const saveUserSession = (userId, sessionData) => {
-  const filePath = path.join(__dirname, `session_${userId}.json`);
-  fs.writeFileSync(filePath, JSON.stringify(sessionData, null, 2));
+  const filePath = path.join(__dirname, `session_${userId}.json`);
+  fs.writeFileSync(filePath, JSON.stringify(sessionData, null, 2));
 };
 
 // Fungsi untuk memuat data pengguna premium dari file JSON
 const loadPremiumUsers = () => {
-  const filePath = path.join(__dirname, 'premium_users.json');
-  if (fs.existsSync(filePath)) {
-    return JSON.parse(fs.readFileSync(filePath));
-  }
-  return {};
+  const filePath = path.join(__dirname, 'premium_users.json');
+  if (fs.existsSync(filePath)) {
+    return JSON.parse(fs.readFileSync(filePath));
+  }
+  return {};
 };
 
 // Fungsi untuk menyimpan data pengguna premium ke file JSON
 const savePremiumUsers = (data) => {
-  const filePath = path.join(__dirname, 'premium_users.json');
-  fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
+  const filePath = path.join(__dirname, 'premium_users.json');
+  fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
 };
 
 // Fungsi untuk memeriksa apakah pengguna adalah premium atau admin
 const isPremiumOrAdmin = (ctx) => {
-  const userId = ctx.from.id.toString();
-  const premiumUsers = loadPremiumUsers();
-  const now = new Date();
-  if (userId === adminId) {
-    return true;
-  }
-  if (premiumUsers[userId] && new Date(premiumUsers[userId].expiryDate) > now) {
-    return true;
-  }
-  return false;
+  const userId = ctx.from.id.toString();
+  const premiumUsers = loadPremiumUsers();
+  const now = new Date();
+  if (userId === adminId) {
+    return true;
+  }
+  if (premiumUsers[userId] && new Date(premiumUsers[userId].expiryDate) > now) {
+    return true;
+  }
+  return false;
 };
+
+// ... (Sisa kode bot Anda)
 
 // Fungsi untuk mengirim pesan ke pengguna yang tidak memiliki akses
 const sendNoAccessMessage = (ctx) => {
