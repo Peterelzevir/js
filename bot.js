@@ -6,7 +6,7 @@
 const { Telegraf } = require('telegraf');
 const fs = require('fs');
 const path = require('path');
-const axios = require('axios');
+const fetch = require('node-fetch');
 const XLSX = require('xlsx');
 const stringSimilarity = require('string-similarity');
 
