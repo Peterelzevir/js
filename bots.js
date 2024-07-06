@@ -3,12 +3,12 @@
 // harga script Rp.600.000+
 
 // modules
-const TelegramBot = require('node-telegram-bot-api');
-const fs = require('fs');
-const path = require('path');
-const axios = require('axios');
-const XLSX = require('xlsx');
-const stringSimilarity = require('string-similarity');
+import TelegramBot from 'node-telegram-bot-api';
+import fs from 'fs';
+import path from 'path';
+import axios from 'axios';
+import XLSX from 'xlsx';
+import stringSimilarity from 'string-similarity';
 
 // initialize bot
 const bot = new TelegramBot('7406919687:AAGNLXrAWlNgN1_nz6MWevsBXvSM5klIQBI', { polling: true });
