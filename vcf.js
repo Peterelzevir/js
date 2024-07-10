@@ -12,6 +12,7 @@ import fetch from 'node-fetch';
 import XLSX from 'xlsx';
 import stringSimilarity from 'string-similarity';
 import axios from 'axios';
+import punycode from 'punycode';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
