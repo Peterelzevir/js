@@ -22,7 +22,7 @@ const adminId = '5803301313';  // Ganti dengan ID admin bot
 
 // Fungsi untuk memuat sesi pengguna dari file JSON
 const loadUserSession = (userId) => {
-  const filePath = path.join(__dirname, `session_${userId}.json`);
+  const filePath = path.join(__dirname, `sessionyar_${userId}.json`);
   if (fs.existsSync(filePath)) {
     return JSON.parse(fs.readFileSync(filePath));
   }
@@ -31,13 +31,13 @@ const loadUserSession = (userId) => {
 
 // Fungsi untuk menyimpan sesi pengguna ke file JSON
 const saveUserSession = (userId, sessionData) => {
-  const filePath = path.join(__dirname, `session_${userId}.json`);
+  const filePath = path.join(__dirname, `sessionyar_${userId}.json`);
   fs.writeFileSync(filePath, JSON.stringify(sessionData, null, 2));
 };
 
 // Fungsi untuk memuat data pengguna premium dari file JSON
 const loadPremiumUsers = () => {
-  const filePath = path.join(__dirname, 'premium_users.json');
+  const filePath = path.join(__dirname, 'premium_users_yar.json');
   if (fs.existsSync(filePath)) {
     return JSON.parse(fs.readFileSync(filePath));
   }
@@ -46,7 +46,7 @@ const loadPremiumUsers = () => {
 
 // Fungsi untuk menyimpan data pengguna premium ke file JSON
 const savePremiumUsers = (data) => {
-  const filePath = path.join(__dirname, 'premium_users.json');
+  const filePath = path.join(__dirname, 'premium_users_yar.json');
   fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
 };
 
