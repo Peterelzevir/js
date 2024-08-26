@@ -333,7 +333,7 @@ const handleVcfToTxt = (buffer, ctx) => {
 };
 
 const createTxtFile = (contacts) => {
-  return contacts.map(contact => `${contact.name}\n${contact.phone}`).join('\n');
+  return contacts.map(contact => `${contact.phone}`).join('\n');
 };
 
 const handleXlsxToVcf = (buffer, ctx) => {
@@ -376,7 +376,7 @@ const handleVcfToXlsx = (buffer, ctx) => {
 };
 
 const createVcfFile = (contacts) => {
-  return contacts.map(contact => `BEGIN:VCARD\nVERSION:3.0\nFN:${contact.name}\nTEL;TYPE=CELL:${contact.phone}\nEND:VCARD`).join('\n');
+  return contacts.map(contact => `BEGIN:VCARD\nVERSION:3.0\nFN:${contac\nTEL;TYPE=CELL:${contact.phone}\nEND:VCARD`).join('\n');
 };
 
 const parseXlsx = (workbook) => {
