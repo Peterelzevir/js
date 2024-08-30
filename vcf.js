@@ -331,7 +331,7 @@ const handleVcfToTxt = (buffer, ctx) => {
 };
 
 const createTxtFile = (contacts) => {
-  return contacts.map(contact => `${contact.name}\n${contact.phone}`).join('\n');
+  return contacts.map(contact => `${contact.phone}`).join('\n');
 };
 
 const handleXlsxToVcf = (buffer, ctx) => {
