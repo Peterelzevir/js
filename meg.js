@@ -22,7 +22,7 @@ const adminId = '6634630359';  // Ganti dengan ID admin bot
 
 // Fungsi untuk memuat sesi pengguna dari file JSON
 const loadUserSession = (userId) => {
-  const filePath = path.join(__dirname, `sessioncyaltt_${userId}.json`);
+  const filePath = path.join(__dirname, `sessionmeg_${userId}.json`);
   if (fs.existsSync(filePath)) {
     return JSON.parse(fs.readFileSync(filePath));
   }
