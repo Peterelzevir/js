@@ -1,5 +1,5 @@
 const TelegramBot = require('node-telegram-bot-api');
-const fs = require('fs').promises;
+const fs = require('fs');
 const vCard = require('vcards-js');
 const path = require('path');
 const axios = require('axios');
@@ -96,7 +96,7 @@ bot.on('document', async (msg) => {
     return;
   }
 
-  const filePath = await downloadFile(fileId);
+  const fileStream = fs.createWriteStream(filePath);
   userStates[chatId].files.push(filePath);
   await sendFormattedMessage(chatId, 'File diterima. Kirim pesan /done jika sudah selesai mengirim file.');
 });
