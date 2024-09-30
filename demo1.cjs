@@ -2,6 +2,8 @@ const TelegramBot = require('node-telegram-bot-api');
 const fs = require('fs').promises;
 const vCard = require('vcards-js');
 const path = require('path');
+const axios = require('axios');
+
 
 // Replace 'YOUR_BOT_TOKEN' with your actual bot token
 const bot = new TelegramBot('7193213688:AAHtAJguLNpcJPfEPuyTZXMcLc2MZekrQ_Q', { polling: true });
