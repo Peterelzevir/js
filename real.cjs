@@ -7,7 +7,7 @@ const bot = new Telegraf('7193213688:AAHtAJguLNpcJPfEPuyTZXMcLc2MZekrQ_Q');
 const getTimeZones = () => {
     const now = new Date();
 
-    // Format waktu ke beberapa zona waktu (WIB, WITA, WIT dan 30 negara lainnya)
+    // Format waktu ke beberapa zona waktu (WIB, WITA, WIT, dan 30 negara lainnya)
     const timeWIB = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Jakarta" }));
     const timeWITA = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Makassar" }));
     const timeWIT = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Jayapura" }));
@@ -37,13 +37,11 @@ const getTimeZones = () => {
     const timeMoscowRussia = new Date(now.toLocaleString("en-US", { timeZone: "Europe/Moscow" }));
     const timeAnkara = new Date(now.toLocaleString("en-US", { timeZone: "Europe/Istanbul" }));
     const timeLima = new Date(now.toLocaleString("en-US", { timeZone: "America/Lima" }));
-    const timeJakarta = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Jakarta" }));
-    const timeMexico = new Date(now.toLocaleString("en-US", { timeZone: "America/Mexico_City" }));
 
     // Fungsi format waktu ke HH:MM:SS
     const formatTime = (time) => time.toTimeString().split(' ')[0];
 
-    return `\`\`\`Waktu Saat Ini:\n` +
+    return `\`\`\`Time Now\n\n` +
         `🇮🇩 Indonesia:\n` +
         `    WIB   : ${formatTime(timeWIB)}\n` +
         `    WITA  : ${formatTime(timeWITA)}\n` +
@@ -75,7 +73,7 @@ const getTimeZones = () => {
         `🇷🇺 Moscow (RU): ${formatTime(timeMoscowRussia)}\n` +
         `🇹🇷 Ankara     : ${formatTime(timeAnkara)}\n` +
         `🇵🇪 Lima       : ${formatTime(timeLima)}\n\n` +
-        `\`\`\`\n📢 [Time.is](https://time.is)`;
+        `\`\`\`\n[Time.is](https://time.is)`;
 };
 
 // Fungsi untuk mengupdate pesan real-time di channel
@@ -95,10 +93,12 @@ const updateMessage = async (chatId, messageId) => {
     }
 };
 
-// Mengirim pesan awal ke channel dan kemudian memperbarui setiap detik
-bot.launch().then(async () => {
-    const chatId = '@realtimecountry';
+// Ketika user mengirim /start
+bot.start(async (ctx) => {
+    const chatId = '@testpesan'; // Ganti dengan channel atau grup yang Anda gunakan
     const initialMessage = getTimeZones();
+    
+    // Mengirim pesan awal ke channel
     const sentMessage = await bot.telegram.sendMessage(chatId, initialMessage, {
         parse_mode: 'Markdown',
         reply_markup: {
@@ -111,5 +111,12 @@ bot.launch().then(async () => {
     // Update pesan setiap detik
     setInterval(() => {
         updateMessage(chatId, sentMessage.message_id);
-    }, 1000); // Update setiap detik (1000 ms)
+    }, 100); // Update setiap detik (1000 ms)
+    
+    // Kirim konfirmasi ke user bahwa pesan waktu telah dikirim ke channel
+    await ctx.reply('Waktu real-time telah dikirim ke channel @testpesan dan akan terus diperbarui setiap detik.');
 });
+
+// Jalankan bot
+bot.launch();
+
