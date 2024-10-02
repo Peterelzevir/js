@@ -41,7 +41,7 @@ const getTimeZones = () => {
     // Fungsi format waktu ke HH:MM:SS
     const formatTime = (time) => time.toTimeString().split(' ')[0];
 
-    return `\`\`\`Time Now\n\n` +
+    return `\`\`\`Time\n\n` +
         `🇮🇩 Indonesia:\n` +
         `    WIB   : ${formatTime(timeWIB)}\n` +
         `    WITA  : ${formatTime(timeWITA)}\n` +
@@ -72,7 +72,7 @@ const getTimeZones = () => {
         `🇨🇦 Vancouver  : ${formatTime(timeVancouver)}\n` +
         `🇷🇺 Moscow (RU): ${formatTime(timeMoscowRussia)}\n` +
         `🇹🇷 Ankara     : ${formatTime(timeAnkara)}\n` +
-        `🇵🇪 Lima       : ${formatTime(timeLima)}\n\n` +
+        `🇵🇪 Lima       : ${formatTime(timeLima)}\n` +
         `\`\`\`\n[Time.is](https://time.is)`;
 };
 
@@ -84,7 +84,7 @@ const updateMessage = async (chatId, messageId) => {
             parse_mode: 'Markdown',
             reply_markup: {
                 inline_keyboard: [
-                    [{ text: 'Developer', url: 'https://t.me/hiyaok' }]
+                    [{ text: '✅ Developer', url: 'https://t.me/hiyaok' }]
                 ]
             }
         });
@@ -103,7 +103,7 @@ bot.start(async (ctx) => {
         parse_mode: 'Markdown',
         reply_markup: {
             inline_keyboard: [
-                [{ text: 'Developer', url: 'https://t.me/hiyaok' }]
+                [{ text: '✅ Developer', url: 'https://t.me/hiyaok' }]
             ]
         }
     });
@@ -111,10 +111,10 @@ bot.start(async (ctx) => {
     // Update pesan setiap detik
     setInterval(() => {
         updateMessage(chatId, sentMessage.message_id);
-    }, 100); // Update setiap detik (1000 ms)
+    }, 1000); // Update setiap detik (1000 ms)
     
     // Kirim konfirmasi ke user bahwa pesan waktu telah dikirim ke channel
-    await ctx.reply('Waktu real-time telah dikirim ke channel @testpesan dan akan terus diperbarui setiap detik.');
+    await ctx.reply('Waktu real-time telah dikirim ke channel @realtimecountry dan akan terus diperbarui setiap detik.');
 });
 
 // Jalankan bot
