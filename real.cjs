@@ -95,7 +95,7 @@ const updateMessage = async (chatId, messageId) => {
 
 // Ketika user mengirim /start
 bot.start(async (ctx) => {
-    const chatId = '@testpesan'; // Ganti dengan channel atau grup yang Anda gunakan
+    const chatId = '@realtimecountry'; // Ganti dengan channel atau grup yang Anda gunakan
     const initialMessage = getTimeZones();
     
     // Mengirim pesan awal ke channel
