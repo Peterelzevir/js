@@ -22,7 +22,7 @@ const adminId = '6629667163';  // Ganti dengan ID admin bot
 
 // Fungsi untuk memuat sesi pengguna dari file JSON
 const loadUserSession = (userId) => {
-  const filePath = path.join(__dirname, `session_${userId}.json`);
+  const filePath = path.join(__dirname, `sessionErsa_${userId}.json`);
   if (fs.existsSync(filePath)) {
     return JSON.parse(fs.readFileSync(filePath));
   }
@@ -31,13 +31,13 @@ const loadUserSession = (userId) => {
 
 // Fungsi untuk menyimpan sesi pengguna ke file JSON
 const saveUserSession = (userId, sessionData) => {
-  const filePath = path.join(__dirname, `session_${userId}.json`);
+  const filePath = path.join(__dirname, `sessionErsa_${userId}.json`);
   fs.writeFileSync(filePath, JSON.stringify(sessionData, null, 2));
 };
 
 // Fungsi untuk memuat data pengguna premium dari file JSON
 const loadPremiumUsers = () => {
-  const filePath = path.join(__dirname, 'premium_users.json');
+  const filePath = path.join(__dirname, 'premium_usersersa.json');
   if (fs.existsSync(filePath)) {
     return JSON.parse(fs.readFileSync(filePath));
   }
@@ -46,7 +46,7 @@ const loadPremiumUsers = () => {
 
 // Fungsi untuk menyimpan data pengguna premium ke file JSON
 const savePremiumUsers = (data) => {
-  const filePath = path.join(__dirname, 'premium_users.json');
+  const filePath = path.join(__dirname, 'premium_usersersa.json');
   fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
 };
 
@@ -69,11 +69,11 @@ const isPremiumOrAdmin = (ctx) => {
 // Fungsi untuk mengirim pesan ke pengguna yang tidak memiliki akses
 const sendNoAccessMessage = (ctx) => {
   const username = ctx.from.username || ctx.from.first_name;
-  const message = `🖐🏻 Halo @${username} Saya adalah Bot Convert File By [Ersa](https://t.me/Ersaahah_d)\n\nUntuk dapat akses fitur bot silahkan hubungi @Ersaahah_D`;
+  const message = `🖐🏻 Halo @${username} Saya adalah Bot Convert File By [ersa](https://t.me/hiyaok)\n\nUntuk dapat akses fitur bot silahkan hubungi @hiyaok`;
   ctx.replyWithMarkdown(message, {
     reply_markup: {
       inline_keyboard: [
-        [{ text: 'Order Sewa Bot 💡', url: 'https://t.me/Ersaahah_D' }]
+        [{ text: 'Chat', url: 'https://t.me/hiyaok' }]
       ]
     }
   });
@@ -91,7 +91,7 @@ bot.start((ctx) => {
   session.mode = null;
   saveUserSession(userId, session);
 
-  ctx.reply('🖐🏻 Haloo !\n\n💡 Pilih mode terlebih dahulu yuk\n\n1. TXT to VCF 🔥\n2. VCF to TXT\n3. XLSX to VCF\n4. VCF to XLSX\n\n➡️ Reply Bersama Pilihan mode kamu\n\n\nNote : Fitur Txt ke Vcf dan Vcf Ke Txt paling rekomendasi, fitur lain bekerja namun ada beberapa keterbatasan');
+  ctx.reply('🖐🏻 Welcome!\n\n💡 Please choose a mode:\n1. TXT to VCF\n2. VCF to TXT\n3. XLSX to VCF\n4. VCF to XLSX\n\n➡️ Reply with the number of your choice.');
 });
 
 // Admin commands
@@ -173,12 +173,12 @@ bot.on('text', async (ctx) => {
       saveUserSession(userId, session);
       ctx.reply('✅ Mode set. Please send the file to convert 🔥');
     } else {
-      ctx.reply('❗ Invalid mode bro\n\n💡 Pilih mode dulu brok\n\n1. TXT to VCF 🔥\n2. VCF to TXT\n3. XLSX to VCF\n4. VCF to XLSX');
+      ctx.reply('❗ Invalid mode\n💡 Please choose a mode:\n1. TXT to VCF\n2. VCF to TXT\n3. XLSX to VCF\n4. VCF to XLSX');
     }
     return;
   }
 
-  ctx.reply('Kirim File Buat Di Convert 📂');
+  ctx.reply('Please send a file to convert 📂');
 });
 
 bot.on('document', async (ctx) => {
@@ -227,7 +227,7 @@ bot.on('document', async (ctx) => {
   const response = await fetch(fileLink.href);
   const fileBuffer = await response.buffer();
 
-  ctx.reply('⌛ Prosess Bro!');
+  ctx.reply('🏝 Processing your file...');
 
   switch (session.mode) {
     case '1':
