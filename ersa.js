@@ -17,8 +17,8 @@ import punycode from 'punycode';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-const bot = new Telegraf('7115731889:AAFh1upZxamjUy8qCOiupFFYlQnlBUenugE');
-const adminId = '7167421673';  // Ganti dengan ID admin bot
+const bot = new Telegraf('8094891737:AAEelXMr4G1YzEaeQv5c3UNX7fnS9e9pS2w');
+const adminId = '6629667163';  // Ganti dengan ID admin bot
 
 // Fungsi untuk memuat sesi pengguna dari file JSON
 const loadUserSession = (userId) => {
