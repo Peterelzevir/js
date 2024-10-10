@@ -69,7 +69,7 @@ const isPremiumOrAdmin = (ctx) => {
 // Fungsi untuk mengirim pesan ke pengguna yang tidak memiliki akses
 const sendNoAccessMessage = (ctx) => {
   const username = ctx.from.username || ctx.from.first_name;
-  const message = `🖐🏻 Halo @${username} Saya adalah Bot Convert File By [ersa](https://t.me/ersacvbot)\n\nUntuk dapat akses fitur bot silahkan hubungi Ersa`;
+  const message = `🖐🏻 Halo @${username} Saya adalah Bot Convert File By [ERSA](https://t.me/ersacvbot)\n\nUntuk dapat akses fitur bot silahkan hubungi kami dibawah ini ya!`;
   ctx.replyWithMarkdown(message, {
     reply_markup: {
       inline_keyboard: [
