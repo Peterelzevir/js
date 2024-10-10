@@ -17,12 +17,12 @@ import punycode from 'punycode';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-const bot = new Telegraf('8094891737:AAEelXMr4G1YzEaeQv5c3UNX7fnS9e9pS2w');
-const adminId = '6629667163';  // Ganti dengan ID admin bot
+const bot = new Telegraf('7115731889:AAFh1upZxamjUy8qCOiupFFYlQnlBUenugE');
+const adminId = '7167421673';  // Ganti dengan ID admin bot
 
 // Fungsi untuk memuat sesi pengguna dari file JSON
 const loadUserSession = (userId) => {
-  const filePath = path.join(__dirname, `sessionErsa_${userId}.json`);
+  const filePath = path.join(__dirname, `session_${userId}.json`);
   if (fs.existsSync(filePath)) {
     return JSON.parse(fs.readFileSync(filePath));
   }
@@ -31,13 +31,13 @@ const loadUserSession = (userId) => {
 
 // Fungsi untuk menyimpan sesi pengguna ke file JSON
 const saveUserSession = (userId, sessionData) => {
-  const filePath = path.join(__dirname, `sessionErsa_${userId}.json`);
+  const filePath = path.join(__dirname, `session_${userId}.json`);
   fs.writeFileSync(filePath, JSON.stringify(sessionData, null, 2));
 };
 
 // Fungsi untuk memuat data pengguna premium dari file JSON
 const loadPremiumUsers = () => {
-  const filePath = path.join(__dirname, 'premium_usersErsa.json');
+  const filePath = path.join(__dirname, 'premium_users.json');
   if (fs.existsSync(filePath)) {
     return JSON.parse(fs.readFileSync(filePath));
   }
@@ -46,7 +46,7 @@ const loadPremiumUsers = () => {
 
 // Fungsi untuk menyimpan data pengguna premium ke file JSON
 const savePremiumUsers = (data) => {
-  const filePath = path.join(__dirname, 'premium_usersErsa.json');
+  const filePath = path.join(__dirname, 'premium_users.json');
   fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
 };
 
@@ -69,7 +69,7 @@ const isPremiumOrAdmin = (ctx) => {
 // Fungsi untuk mengirim pesan ke pengguna yang tidak memiliki akses
 const sendNoAccessMessage = (ctx) => {
   const username = ctx.from.username || ctx.from.first_name;
-  const message = `🖐🏻 Halo @${username} Saya adalah Bot Convert File By [Ersa](https://t.me/Ersaahah_D)\n\nUntuk dapat akses fitur bot silahkan hubungi @Ersaahah_D`;
+  const message = `🖐🏻 Halo @${username} Saya adalah Bot Convert File By [Ersa](https://t.me/Ersaahah_d)\n\nUntuk dapat akses fitur bot silahkan hubungi @Ersaahah_D`;
   ctx.replyWithMarkdown(message, {
     reply_markup: {
       inline_keyboard: [
