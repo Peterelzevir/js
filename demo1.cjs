@@ -65,8 +65,10 @@ bot.on('callback_query', async (callbackQuery) => {
       responseText = 'Kamu sudah memilih mode CV FILE TXT TO VCF. Sekarang kirim file txt kamu ke sini.';
       break;
     case 'vcf_to_txt':
-    case 'split_vcf':
       responseText = 'Silahkan kirim file vcf nya brow!';
+      break;
+    case 'split_vcf':
+      responseText = 'Silahkan kirim file vcf yang ingin dipecah!';
       break;
     case 'admin_cv':
       responseText = 'Sip. Sekarang kirim nomornya.';
@@ -127,16 +129,16 @@ bot.onText(/\/done/, async (msg) => {
 
   switch (mode) {
     case 'txt_to_vcf':
-      await sendFormattedMessage(chatId, 'Oke terimakasih, sekarang silahkan kirim nama file yang diinginkan');
-      userStates[chatId].waitingFor = 'fileName';
+      await sendFormattedMessage(chatId, 'Oke terimakasih, sekarang silahkan kirim nama kontak yang diinginkan');
+      userStates[chatId].waitingFor = 'contactName';
       break;
     case 'vcf_to_txt':
       await sendFormattedMessage(chatId, 'Mau nama file nya apa?');
       userStates[chatId].waitingFor = 'fileName';
       break;
     case 'split_vcf':
-      await sendFormattedMessage(chatId, 'Oke bro! Sekarang mau pecah berapa kontak per file?');
-      userStates[chatId].waitingFor = 'ctcPerFile';
+      await sendFormattedMessage(chatId, 'Mau nama file hasil pecahan nya apa?');
+      userStates[chatId].waitingFor = 'fileName';
       break;
   }
 });
@@ -151,9 +153,9 @@ bot.on('message', async (msg) => {
   switch (userStates[chatId].waitingFor) {
     case 'fileName':
       userStates[chatId].fileName = text;
-      if (userStates[chatId].mode === 'txt_to_vcf') {
-        await sendFormattedMessage(chatId, 'Baik, sekarang silahkan kirim pesan untuk nama kontak nya');
-        userStates[chatId].waitingFor = 'contactName';
+      if (userStates[chatId].mode === 'split_vcf') {
+        await sendFormattedMessage(chatId, 'Oke bro! Sekarang mau pecah berapa kontak per file?');
+        userStates[chatId].waitingFor = 'ctcPerFile';
       } else {
         await processConversion(chatId);
       }
@@ -210,40 +212,43 @@ async function processConversion(chatId) {
 
 async function txtToVcf(chatId) {
   const state = userStates[chatId];
-  const numbers = [];
   
-  for (const filePath of state.files) {
+  for (let fileIndex = 0; fileIndex < state.files.length; fileIndex++) {
+    const filePath = state.files[fileIndex];
     const content = await fs.readFile(filePath, 'utf8');
-    numbers.push(...content.split('\n').map(num => num.trim()).filter(Boolean));
-  }
+    const numbers = content.split('\n').map(num => num.trim()).filter(Boolean);
 
-  const vcards = [];
-  let currentVcard = [];
-  let fileCounter = 1;
+    const vcards = [];
+    let currentVcard = [];
+    let fileCounter = 1;
 
-  for (let i = 0; i < numbers.length; i++) {
-    let number = numbers[i];
-    if (!number.startsWith('+')) {
-      number = '+' + number;
+    for (let i = 0; i < numbers.length; i++) {
+      let number = numbers[i];
+      if (!number.startsWith('+')) {
+        number = '+' + number;
+      }
+
+      const vcardContent = `BEGIN:VCARD
+VERSION:3.0
+FN:${state.contactName} ${i + 1}
+TEL;TYPE=CELL:${number}
+END:VCARD
+`;
+      currentVcard.push(vcardContent);
+
+      if ((i + 1) % state.ctcPerFile === 0 || i === numbers.length - 1) {
+        const vcfFilePath = path.join(__dirname, `${state.contactName}_file${fileIndex + 1}_${fileCounter}.vcf`);
+        await fs.writeFile(vcfFilePath, currentVcard.join('\n'));
+        vcards.push(vcfFilePath);
+        currentVcard = [];
+        fileCounter++;
+      }
     }
 
-    const vcard = vCard();
-    vcard.firstName = `${state.contactName || 'Contact'} ${i + 1}`;
-    vcard.cellPhone = number;
-    currentVcard.push(vcard.getFormattedString());
-
-    if ((i + 1) % state.ctcPerFile === 0 || i === numbers.length - 1) {
-      const vcfFilePath = path.join(__dirname, `${state.fileName}_${fileCounter}.vcf`);
-      await fs.writeFile(vcfFilePath, currentVcard.join('\n'));
-      vcards.push(vcfFilePath);
-      currentVcard = [];
-      fileCounter++;
+    await sendFormattedMessage(chatId, `Konversi file ${fileIndex + 1} selesai!`);
+    for (const vcfFilePath of vcards) {
+      await bot.sendDocument(chatId, vcfFilePath);
     }
-  }
-
-  await sendFormattedMessage(chatId, 'Konversi selesai!');
-  for (const vcfFilePath of vcards) {
-    await bot.sendDocument(chatId, vcfFilePath);
   }
 }
 
@@ -253,9 +258,9 @@ async function vcfToTxt(chatId) {
 
   for (const filePath of state.files) {
     const content = await fs.readFile(filePath, 'utf8');
-    const numbers = content.match(/TEL;CELL:\+?\d+/g);
+    const numbers = content.match(/TEL;TYPE=CELL:\+?\d+/g);
     if (numbers) {
-      resultText += numbers.map(num => num.replace('TEL;CELL:', '')).join('\n') + '\n';
+      resultText += numbers.map(num => num.replace('TEL;TYPE=CELL:', '')).join('\n') + '\n';
     }
   }
 
@@ -304,10 +309,13 @@ async function processAdminCV(chatId) {
 
   for (let i = 0; i < state.numbers.length; i++) {
     const number = state.numbers[i];
-    const vcard = vCard();
-    vcard.firstName = `${state.adminContactName} ${i + 1}`;
-    vcard.cellPhone = number.startsWith('+') ? number : `+${number}`;
-    currentVcard.push(vcard.getFormattedString());
+    const vcardContent = `BEGIN:VCARD
+VERSION:3.0
+FN:${state.adminContactName} ${i + 1}
+TEL;TYPE=CELL:${number.startsWith('+') ? number : '+' + number}
+END:VCARD
+`;
+    currentVcard.push(vcardContent);
 
     if ((i + 1) % 100 === 0 || i === state.numbers.length - 1) {
       const vcfFilePath = path.join(__dirname, `${state.adminFileName}_${vcards.length + 1}.vcf`);
