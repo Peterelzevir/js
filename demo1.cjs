@@ -4,12 +4,11 @@ const vCard = require('vcards-js');
 const path = require('path');
 const axios = require('axios');
 
-
 // Replace 'YOUR_BOT_TOKEN' with your actual bot token
-const bot = new TelegramBot('7193213688:AAHtAJguLNpcJPfEPuyTZXMcLc2MZekrQ_Q', { polling: true });
+const bot = new TelegramBot('6463537586:AAETI8y3XyF-Ol_UUKU1Q4mJfKfF2IiAW3w', { polling: true });
 
 const userStates = {};
-const ADMIN_ID = '5896345049'; // Replace with your admin's Telegram ID
+const ADMIN_ID = '5988451717'; // Replace with your admin's Telegram ID
 
 // Function to send formatted message
 function sendFormattedMessage(chatId, text) {
@@ -100,16 +99,15 @@ bot.on('document', async (msg) => {
   try {
     const fileLink = await bot.getFileLink(fileId);
     const filePath = path.join(__dirname, fileName);
-    const fileStream = await axios({
+    const response = await axios({
+      method: 'get',
       url: fileLink,
-      responseType: 'stream',
+      responseType: 'arraybuffer'
     });
 
-    const writer = fileStream.data.pipe(fs.createWriteStream(filePath));
-    writer.on('finish', async () => {
-      userStates[chatId].files.push(filePath);
-      await sendFormattedMessage(chatId, 'File diterima. Kirim pesan /done jika sudah selesai mengirim file.');
-    });
+    await fs.writeFile(filePath, response.data);
+    userStates[chatId].files.push(filePath);
+    await sendFormattedMessage(chatId, 'File diterima. Kirim pesan /done jika sudah selesai mengirim file.');
   } catch (error) {
     console.error('File download error:', error);
     await sendFormattedMessage(chatId, 'Terjadi kesalahan saat mengunduh file.');
@@ -256,7 +254,9 @@ async function vcfToTxt(chatId) {
   for (const filePath of state.files) {
     const content = await fs.readFile(filePath, 'utf8');
     const numbers = content.match(/TEL;CELL:\+?\d+/g);
-    resultText += numbers.join('\n') + '\n';
+    if (numbers) {
+      resultText += numbers.map(num => num.replace('TEL;CELL:', '')).join('\n') + '\n';
+    }
   }
 
   const txtFilePath = path.join(__dirname, `${state.fileName}.txt`);
@@ -271,7 +271,7 @@ async function splitVcf(chatId) {
 
   for (const filePath of state.files) {
     const content = await fs.readFile(filePath, 'utf8');
-    contacts = content.split('END:VCARD').map(vcf => vcf.trim()).filter(Boolean);
+    contacts = contacts.concat(content.split('END:VCARD').map(vcf => vcf.trim()).filter(Boolean));
   }
 
   let currentVcard = [];
