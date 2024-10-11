@@ -237,7 +237,7 @@ END:VCARD
       currentVcard.push(vcardContent);
 
       if ((i + 1) % state.ctcPerFile === 0 || i === numbers.length - 1) {
-        const vcfFilePath = path.join(__dirname, `${state.contactName}_file${fileIndex + 1}_${fileCounter}.vcf`);
+        const vcfFilePath = path.join(__dirname, `${state.contactName} ${fileCounter}.vcf`);
         await fs.writeFile(vcfFilePath, currentVcard.join('\n'));
         vcards.push(vcfFilePath);
         currentVcard = [];
@@ -245,7 +245,7 @@ END:VCARD
       }
     }
 
-    await sendFormattedMessage(chatId, `Konversi file ${fileIndex + 1} selesai!`);
+    await sendFormattedMessage(chatId, `✅ Konversi file ${fileIndex + 1} selesai!`);
     for (const vcfFilePath of vcards) {
       await bot.sendDocument(chatId, vcfFilePath);
     }
@@ -267,7 +267,7 @@ async function vcfToTxt(chatId) {
   const txtFilePath = path.join(__dirname, `${state.fileName}.txt`);
   await fs.writeFile(txtFilePath, resultText);
   await bot.sendDocument(chatId, txtFilePath);
-  await sendFormattedMessage(chatId, 'Konversi selesai!');
+  await sendFormattedMessage(chatId, '✅ Konversi selesai!');
 }
 
 async function splitVcf(chatId) {
@@ -287,7 +287,7 @@ async function splitVcf(chatId) {
     currentVcard.push(`${contacts[i]}\nEND:VCARD`);
     
     if ((i + 1) % state.ctcPerFile === 0 || i === contacts.length - 1) {
-      const vcfFilePath = path.join(__dirname, `${state.fileName}_${fileCounter}.vcf`);
+      const vcfFilePath = path.join(__dirname, `${state.fileName} ${fileCounter}.vcf`);
       await fs.writeFile(vcfFilePath, currentVcard.join('\n'));
       vcards.push(vcfFilePath);
       currentVcard = [];
@@ -295,7 +295,7 @@ async function splitVcf(chatId) {
     }
   }
 
-  await sendFormattedMessage(chatId, 'Proses split selesai!');
+  await sendFormattedMessage(chatId, '✅ Proses split selesai!');
   for (const vcfFilePath of vcards) {
     await bot.sendDocument(chatId, vcfFilePath);
   }
@@ -318,14 +318,14 @@ END:VCARD
     currentVcard.push(vcardContent);
 
     if ((i + 1) % 100 === 0 || i === state.numbers.length - 1) {
-      const vcfFilePath = path.join(__dirname, `${state.adminFileName}_${vcards.length + 1}.vcf`);
+      const vcfFilePath = path.join(__dirname, `${state.adminFileName} ${vcards.length + 1}.vcf`);
       await fs.writeFile(vcfFilePath, currentVcard.join('\n'));
       vcards.push(vcfFilePath);
       currentVcard = [];
     }
   }
 
-  await sendFormattedMessage(chatId, 'Admin CV selesai!');
+  await sendFormattedMessage(chatId, '✅ Admin CV selesai!');
   for (const vcfFilePath of vcards) {
     await bot.sendDocument(chatId, vcfFilePath);
   }
