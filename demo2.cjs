@@ -5,7 +5,7 @@ const path = require('path');
 const axios = require('axios');
 
 // Replace 'YOUR_BOT_TOKEN' with your actual bot token
-const bot = new TelegramBot('7618230333:AAFBVzvPObywF522DtUYlY6lfNe_VDAwRwM', { polling: true });
+const bot = new TelegramBot('7618230333:AAGhwQvtz64u6sHM-bOYxppifjitBgaetzw', { polling: true });
 
 const userStates = {};
 const ADMIN_ID = '5988451717'; // Replace with your admin's Telegram ID
