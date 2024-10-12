@@ -44,12 +44,12 @@ bot.onText(/\/start/, async (msg) => {
       [{ text: 'CV FILE TXT TO VCF', callback_data: 'txt_to_vcf' }],
       [{ text: 'VCF TO TXT', callback_data: 'vcf_to_txt' }],
       [{ text: 'BAGI VCF', callback_data: 'split_vcf' }],
-      [{ text: 'CV FILE ADMIN', callback_data: 'admin_cv' }]
+      [{ text: 'CV LEWAT TEXT / ADMIN', callback_data: 'admin_cv' }]
     ]
   };
 
-  await sendFormattedMessage(chatId, `Halo @${username}, saya adalah bot cv file by @hiyaok`);
-  await bot.sendMessage(chatId, 'Pilih mode:', { reply_markup: keyboard });
+  await sendFormattedMessage(chatId, `😁 Halo @${username}, saya adalah bot cv file by @hiyaok`);
+  await bot.sendMessage(chatId, '😡 Pilih mode:', { reply_markup: keyboard });
 });
 
 // Callback query handler
@@ -68,10 +68,10 @@ bot.on('callback_query', async (callbackQuery) => {
       responseText = 'Silahkan kirim file vcf nya brow!';
       break;
     case 'split_vcf':
-      responseText = 'Silahkan kirim file vcf yang ingin dipecah!';
+      responseText = 'Silahkan kirim file vcf yang ingin di bagi coy';
       break;
     case 'admin_cv':
-      responseText = 'Sip. Sekarang kirim nomornya.';
+      responseText = 'Sip. Sekarang kirim nomornya cok';
       userStates[chatId].waitingFor = 'numbers';
       break;
   }
@@ -86,7 +86,7 @@ bot.on('document', async (msg) => {
   const fileName = msg.document.file_name;
 
   if (!userStates[chatId]) {
-    await sendFormattedMessage(chatId, 'Pilih mode terlebih dahulu!');
+    await sendFormattedMessage(chatId, '😡 Pilih mode dulu blok! kirim pesan /start buat pilih mode');
     return;
   }
 
@@ -94,7 +94,7 @@ bot.on('document', async (msg) => {
 
   if ((mode === 'txt_to_vcf' && !fileName.endsWith('.txt')) ||
       ((mode === 'vcf_to_txt' || mode === 'split_vcf') && !fileName.endsWith('.vcf'))) {
-    await sendFormattedMessage(chatId, 'File tidak sesuai dengan mode yang dipilih.');
+    await sendFormattedMessage(chatId, 'Nih orang aneh ya, Pilih nya mode apa, Kirim file nya apa 🙂');
     return;
   }
 
@@ -109,10 +109,10 @@ bot.on('document', async (msg) => {
 
     await fs.writeFile(filePath, response.data);
     userStates[chatId].files.push(filePath);
-    await sendFormattedMessage(chatId, 'File diterima. Kirim pesan /done jika sudah selesai mengirim file.');
+    await sendFormattedMessage(chatId, '✅ File diterima. Kirim pesan /done jika sudah selesai mengirim file.');
   } catch (error) {
     console.error('File download error:', error);
-    await sendFormattedMessage(chatId, 'Terjadi kesalahan saat mengunduh file.');
+    await sendFormattedMessage(chatId, '😡 Terjadi kesalahan saat mengunduh file.');
   }
 });
 
@@ -121,7 +121,7 @@ bot.onText(/\/done/, async (msg) => {
   const chatId = msg.chat.id;
 
   if (!userStates[chatId] || userStates[chatId].files.length === 0) {
-    await sendFormattedMessage(chatId, 'Anda belum mengirim file!');
+    await sendFormattedMessage(chatId, '😌 Anda belum mengirim file!');
     return;
   }
 
@@ -197,7 +197,7 @@ bot.on('message', async (msg) => {
 
 async function processConversion(chatId) {
   const state = userStates[chatId];
-  await sendFormattedMessage(chatId, 'Memproses...');
+  await sendFormattedMessage(chatId, 'memproses coy..');
 
   try {
     switch (state.mode) {
@@ -213,7 +213,7 @@ async function processConversion(chatId) {
     }
   } catch (error) {
     console.error('Error during conversion:', error);
-    await sendFormattedMessage(chatId, 'Terjadi kesalahan saat konversi. Silakan coba lagi.');
+    await sendFormattedMessage(chatId, '😡 Terjadi kesalahan saat konversi. Silakan coba lagi.');
   }
 
   delete userStates[chatId];
@@ -246,7 +246,7 @@ END:VCARD
       currentVcard.push(vcardContent);
 
       if ((i + 1) % state.ctcPerFile === 0 || i === numbers.length - 1) {
-        const vcfFilePath = path.join(__dirname, `${state.outputFileName}_${fileCounter}.vcf`);
+        const vcfFilePath = path.join(__dirname, `${state.outputFileName} ${fileCounter}.vcf`);
         await fs.writeFile(vcfFilePath, currentVcard.join('\n'));
         vcards.push(vcfFilePath);
         currentVcard = [];
@@ -254,7 +254,7 @@ END:VCARD
       }
     }
 
-    await sendFormattedMessage(chatId, `✅ Konversi file ${fileIndex + 1} selesai!`);
+    await sendFormattedMessage(chatId, `✅ Konversi file yang ke ${fileIndex + 1} selesai!`);
     for (const vcfFilePath of vcards) {
       await bot.sendDocument(chatId, vcfFilePath);
     }
@@ -271,10 +271,10 @@ async function vcfToTxt(chatId) {
     
     if (numbers) {
       const resultText = numbers.map(num => num.replace('TEL;TYPE=CELL:', '')).join('\n');
-      const txtFilePath = path.join(__dirname, `${state.fileName}_${fileIndex + 1}.txt`);
+      const txtFilePath = path.join(__dirname, `${state.fileName} ${fileIndex + 1}.txt`);
       await fs.writeFile(txtFilePath, resultText);
       
-      await sendFormattedMessage(chatId, `✅ Konversi file ${fileIndex + 1} selesai!`);
+      await sendFormattedMessage(chatId, `✅ Konversi file yang ke ${fileIndex + 1} selesai!`);
       await bot.sendDocument(chatId, txtFilePath);
     } else {
       await sendFormattedMessage(chatId, `❌ Tidak ada nomor telepon ditemukan di file ${fileIndex + 1}.`);
@@ -300,7 +300,7 @@ async function splitVcf(chatId) {
       currentVcard.push(`${contacts[i]}\nEND:VCARD`);
       
       if ((i + 1) % state.ctcPerFile === 0 || i === contacts.length - 1) {
-        const vcfFilePath = path.join(__dirname, `${state.fileName}_${fileIndex + 1}_${fileCounter}.vcf`);
+        const vcfFilePath = path.join(__dirname, `${state.fileName} ${fileIndex + 1}_${fileCounter}.vcf`);
         await fs.writeFile(vcfFilePath, currentVcard.join('\n'));
         vcards.push(vcfFilePath);
         currentVcard = [];
@@ -308,7 +308,7 @@ async function splitVcf(chatId) {
       }
     }
 
-    await sendFormattedMessage(chatId, `✅ Proses split file ${fileIndex + 1} selesai!`);
+    await sendFormattedMessage(chatId, `✅ Proses split file yang ke ${fileIndex + 1} selesai!`);
     for (const vcfFilePath of vcards) {
       await bot.sendDocument(chatId, vcfFilePath);
     }
@@ -341,7 +341,7 @@ END:VCARD
     }
   }
 
-  await sendFormattedMessage(chatId, '✅ Admin CV selesai!');
+  await sendFormattedMessage(chatId, '✅ CV via text selesai ye!');
   for (const vcfFilePath of vcards) {
     await bot.sendDocument(chatId, vcfFilePath);
   }
