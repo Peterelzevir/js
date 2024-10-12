@@ -300,7 +300,7 @@ async function splitVcf(chatId) {
       currentVcard.push(`${contacts[i]}\nEND:VCARD`);
       
       if ((i + 1) % state.ctcPerFile === 0 || i === contacts.length - 1) {
-        const vcfFilePath = path.join(__dirname, `${state.fileName} ${fileIndex + 1}_${fileCounter}.vcf`);
+        const vcfFilePath = path.join(__dirname, `${state.fileName} ${fileIndex + 1}-${fileCounter}.vcf`);
         await fs.writeFile(vcfFilePath, currentVcard.join('\n'));
         vcards.push(vcfFilePath);
         currentVcard = [];
