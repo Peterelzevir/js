@@ -222,6 +222,9 @@ async function processConversion(chatId) {
 async function txtToVcf(chatId) {
   const state = userStates[chatId];
   
+  // Inisialisasi variabel untuk melacak nomor urut
+  let overallCounter = 1;
+
   for (let fileIndex = 0; fileIndex < state.files.length; fileIndex++) {
     const filePath = state.files[fileIndex];
     const content = await fs.readFile(filePath, 'utf8');
@@ -229,7 +232,6 @@ async function txtToVcf(chatId) {
 
     const vcards = [];
     let currentVcard = [];
-    let fileCounter = 1;
 
     for (let i = 0; i < numbers.length; i++) {
       let number = numbers[i];
@@ -239,18 +241,19 @@ async function txtToVcf(chatId) {
 
       const vcardContent = `BEGIN:VCARD
 VERSION:3.0
-FN:${state.contactName} ${i + 1}
+FN:${state.contactName} ${overallCounter}  // Ganti penomoran dengan overallCounter
 TEL;TYPE=CELL:${number}
 END:VCARD
 `;
       currentVcard.push(vcardContent);
+      overallCounter++; // Tingkatkan overallCounter setelah setiap vCard ditambahkan
 
+      // Simpan file VCF setiap n kontak
       if ((i + 1) % state.ctcPerFile === 0 || i === numbers.length - 1) {
-        const vcfFilePath = path.join(__dirname, `${state.outputFileName} ${fileCounter}.vcf`);
+        const vcfFilePath = path.join(__dirname, `${state.outputFileName} ${Math.ceil(overallCounter / state.ctcPerFile)}.vcf`);
         await fs.writeFile(vcfFilePath, currentVcard.join('\n'));
         vcards.push(vcfFilePath);
         currentVcard = [];
-        fileCounter++;
       }
     }
 
@@ -260,6 +263,7 @@ END:VCARD
     }
   }
 }
+
 
 async function vcfToTxt(chatId) {
   const state = userStates[chatId];
