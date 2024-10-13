@@ -1,7 +1,7 @@
 const TelegramBot = require('node-telegram-bot-api');
 
 // Ganti dengan token bot Anda
-const token = '7534541078:AAGmAcTMfcmezzUPg8TgQJtSVqb_7XpDnnE';
+const token = '7517026994:AAE9Hp2p2alN50oqe9F1H_Rtvb1hv506DLk';
 
 // Buat bot dengan mode polling
 const bot = new TelegramBot(token, { polling: true });
@@ -9,6 +9,7 @@ const bot = new TelegramBot(token, { polling: true });
 let chatSessions = {};
 let queue = [];
 let activeAdminSession = false;
+let blacklist = {}; // Penyimpanan blacklist
 
 // Fungsi untuk memulai sesi live chat
 function startChatSession(userId, chatId) {
@@ -38,6 +39,20 @@ function endChatSession(userId, manual = false) {
   }
 }
 
+// Fungsi untuk menambahkan user ke blacklist
+function blacklistUser(userId, chatId) {
+  blacklist[userId] = true; // Tambahkan user ke daftar blacklist
+  endChatSession(userId, true); // Hentikan sesi live chat
+
+  // Beritahu user bahwa mereka masuk daftar blacklist
+  bot.sendMessage(chatId, '⚠️ Anda telah masuk daftar blacklist dan tidak bisa lagi mengakses live chat.');
+}
+
+// Fungsi untuk memeriksa apakah user di-blacklist
+function isBlacklisted(userId) {
+  return blacklist[userId];
+}
+
 // Fungsi untuk mengelola antrian
 function manageQueue() {
   if (queue.length > 0) {
@@ -49,7 +64,8 @@ function manageQueue() {
       parse_mode: 'Markdown',
       reply_markup: {
         inline_keyboard: [
-          [{ text: '❌ Hentikan Sesi', callback_data: `end_chat_${nextUser.user.id}` }]
+          [{ text: '❌ Hentikan Sesi', callback_data: `end_chat_${nextUser.user.id}` }],
+          [{ text: '🚫 Blacklist User', callback_data: `blacklist_${nextUser.user.id}` }]
         ]
       }
     });
@@ -59,7 +75,7 @@ function manageQueue() {
     
     // Update status antrian ke user yang sedang menunggu
     queue.forEach((userInQueue, index) => {
-      bot.editMessageText(`⏳ Anda berada di posisi antrian ke-${index + 1}. Mohon tunggu...`, {
+      bot.editMessageText(`⏳ Anda sekarang berada di posisi antrian ke-${queue.length + 1}\n\n🙂 Mohon tunggu dan jangan khawatir pesan anda akan otomatis terkirim ke admin ketika anda sudah memasuki sesi livechat`, {
         chat_id: userInQueue.message.chat.id,
         message_id: userInQueue.queueMessageId
       });
@@ -89,19 +105,24 @@ bot.on('message', (msg) => {
   const chatId = msg.chat.id;
   const userId = msg.from.id;
 
+  if (isBlacklisted(userId)) {
+    bot.sendMessage(chatId, '⚠️ Anda tidak bisa mengakses live chat karena Anda telah di-blacklist');
+    return;
+  }
+
   if (msg.text === '/start') {
     // Pesan untuk user saat memulai bot
     const welcomeMessage = `
-    *Selamat datang di Bot Live Chat!*\n
-    Saya di sini untuk membantu Anda terhubung dengan admin.\n
-    _Silakan kirim pesan Anda, dan admin kami akan segera merespons._\n
-    Tekan tombol di bawah ini untuk mulai chatting atau mencari bantuan lainnya.
+    *Selamat datang di Bot Live Chat 🙂!*\n
+    🙏🏻 Saya di sini untuk membantu Anda terhubung dengan admin.\n\n
+    📢 _Silakan kirim pesan Anda, dan admin kami akan segera merespons._\n
+    ✅ Tekan tombol di bawah ini untuk mulai chatting atau mencari bantuan lainnya.
     `;
     const options = {
       reply_markup: {
         inline_keyboard: [
           [{ text: "💬 Mulai Live Chat", callback_data: 'live_chat' }],
-          [{ text: "❓ Bantuan", callback_data: 'help' }]
+          [{ text: "❓ Bantuan Live Chat", callback_data: 'help' }]
         ]
       },
       parse_mode: 'Markdown'
@@ -112,7 +133,7 @@ bot.on('message', (msg) => {
     if (!chatSessions[userId]) {
       if (activeAdminSession) {
         // Jika admin sedang aktif dalam sesi, masukkan user ke antrian
-        const queueMessage = `⏳ Anda berada di posisi antrian ke-${queue.length + 1}. Mohon tunggu...`;
+        const queueMessage = `⏳ Anda berada di posisi antrian ke-${queue.length + 1}\n\n🙂 Mohon tunggu dan jangan khawatir pesan anda akan otomatis terkirim ke admin ketika anda sudah memasuki sesi livechat 🙏🏻`;
         bot.sendMessage(chatId, queueMessage).then((queueMessageData) => {
           queue.push({
             user: msg.from,
@@ -129,7 +150,8 @@ bot.on('message', (msg) => {
           parse_mode: 'Markdown',
           reply_markup: {
             inline_keyboard: [
-              [{ text: '❌ Hentikan Sesi', callback_data: `end_chat_${msg.from.id}` }]
+              [{ text: '❌ Hentikan Sesi', callback_data: `end_chat_${msg.from.id}` }],
+              [{ text: '🚫 Blacklist User', callback_data: `blacklist_${msg.from.id}` }]
             ]
           }
         });
@@ -159,12 +181,15 @@ bot.on('callback_query', (callbackQuery) => {
   const data = callbackQuery.data;
 
   if (data === 'live_chat') {
-    bot.sendMessage(chatId, '💬 Anda sekarang berada di mode Live Chat. Silakan kirim pesan Anda.');
+    bot.sendMessage(chatId, '📢 Anda sekarang berada di mode Live Chat Kak ✅\n\n🙏🏻Silakan kirim pesan kamu');
   } else if (data === 'help') {
-    bot.sendMessage(chatId, '❓ Bantuan: Kirim pesan Anda dan admin akan segera merespons.');
+    bot.sendMessage(chatId, '❓ Bantuan : Kirim pesan Anda dan admin akan segera merespons.');
   } else if (data.startsWith('end_chat_')) {
     const userId = data.split('_')[2];
     endChatSession(userId, true);
+  } else if (data.startsWith('blacklist_')) {
+    const userId = data.split('_')[1];
+    blacklistUser(userId, chatId);
   }
 
   bot.answerCallbackQuery(callbackQuery.id);
