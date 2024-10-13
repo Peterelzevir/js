@@ -10,6 +10,8 @@ const bot = new TelegramBot('7573695228:AAF8OWW1V4ikbb9mIJPxMhcAyAQPyRDYqlI', { 
 const userStates = {};
 const ADMIN_ID = '5988451717'; // Replace with your admin's Telegram ID
 
+let numberCounter = 1; // Variabel global untuk menyimpan penomoran antar file
+
 // Function to send formatted message
 function sendFormattedMessage(chatId, text) {
   return bot.sendMessage(chatId, `*\`${text}\`*`, { parse_mode: 'MarkdownV2' });
@@ -220,12 +222,7 @@ async function processConversion(chatId) {
 }
 
 async function txtToVcf(chatId) {
-async function txtToVcf(chatId) {
   const state = userStates[chatId];
-  
-  // Inisialisasi variabel untuk melacak nomor urut kontak dan file secara keseluruhan
-  let overallCounter = 1;
-  let fileCounter = 1;  // Variabel fileCounter di luar loop sehingga tidak di-reset
 
   for (let fileIndex = 0; fileIndex < state.files.length; fileIndex++) {
     const filePath = state.files[fileIndex];
@@ -234,6 +231,7 @@ async function txtToVcf(chatId) {
 
     const vcards = [];
     let currentVcard = [];
+    let fileCounter = 1;
 
     for (let i = 0; i < numbers.length; i++) {
       let number = numbers[i];
@@ -241,22 +239,24 @@ async function txtToVcf(chatId) {
         number = '+' + number;
       }
 
+      // Gunakan numberCounter untuk penomoran yang berurutan antar file
       const vcardContent = `BEGIN:VCARD
 VERSION:3.0
-FN:${state.contactName} ${overallCounter}  // Menggunakan overallCounter untuk penomoran kontak yang berurutan
+FN:${state.contactName} ${numberCounter} 
 TEL;TYPE=CELL:${number}
 END:VCARD
 `;
       currentVcard.push(vcardContent);
-      overallCounter++;  // Tambah nomor urut setelah setiap kontak
 
-      // Simpan file VCF setiap n kontak
+      // Increment numberCounter setiap kali VCF dibuat
+      numberCounter++;
+
       if ((i + 1) % state.ctcPerFile === 0 || i === numbers.length - 1) {
-        const vcfFilePath = path.join(__dirname, `${state.outputFileName} ${fileCounter}.vcf`);  // Tetap melanjutkan fileCounter
+        const vcfFilePath = path.join(__dirname, `${state.outputFileName} ${fileCounter}.vcf`);
         await fs.writeFile(vcfFilePath, currentVcard.join('\n'));
         vcards.push(vcfFilePath);
         currentVcard = [];
-        fileCounter++;  // Tingkatkan fileCounter setelah file disimpan
+        fileCounter++;
       }
     }
 
