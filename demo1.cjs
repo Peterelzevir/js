@@ -113,10 +113,7 @@ bot.on('message', (msg) => {
   if (msg.text === '/start') {
     // Pesan untuk user saat memulai bot
     const welcomeMessage = `
-    *Selamat datang di Bot Live Chat 🙂!*\n
-    🙏🏻 Saya di sini untuk membantu Anda terhubung dengan admin.\n\n
-    📢 _Silakan kirim pesan Anda, dan admin kami akan segera merespons._\n
-    ✅ Tekan tombol di bawah ini untuk mulai chatting atau mencari bantuan lainnya.
+    *Selamat datang di Bot Live Chat 🙂!*\n🙏🏻 Saya di sini untuk membantu Anda terhubung dengan admin.\n\n📢 _Silakan kirim pesan Anda, dan admin kami akan segera merespons._\n\n✅ Tekan tombol di bawah ini untuk mulai chatting atau mencari bantuan lainnya.
     `;
     const options = {
       reply_markup: {
