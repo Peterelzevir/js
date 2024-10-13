@@ -11,6 +11,7 @@ const userStates = {};
 const ADMIN_ID = '5988451717'; // Replace with your admin's Telegram ID
 
 let numberCounter = 1; // Variabel global untuk menyimpan penomoran antar file
+let fileCounter = 1;   // Variabel global untuk melanjutkan penomoran file antar proses
 
 // Function to send formatted message
 function sendFormattedMessage(chatId, text) {
@@ -231,7 +232,6 @@ async function txtToVcf(chatId) {
 
     const vcards = [];
     let currentVcard = [];
-    let fileCounter = 1;
 
     for (let i = 0; i < numbers.length; i++) {
       let number = numbers[i];
@@ -239,7 +239,7 @@ async function txtToVcf(chatId) {
         number = '+' + number;
       }
 
-      // Gunakan numberCounter untuk penomoran yang berurutan antar file
+      // Gunakan numberCounter untuk penomoran kontak
       const vcardContent = `BEGIN:VCARD
 VERSION:3.0
 FN:${state.contactName} ${numberCounter} 
@@ -248,15 +248,16 @@ END:VCARD
 `;
       currentVcard.push(vcardContent);
 
-      // Increment numberCounter setiap kali VCF dibuat
+      // Increment numberCounter setiap kali kontak dibuat
       numberCounter++;
 
+      // Buat file VCF setelah jumlah kontak mencapai state.ctcPerFile atau akhir file
       if ((i + 1) % state.ctcPerFile === 0 || i === numbers.length - 1) {
         const vcfFilePath = path.join(__dirname, `${state.outputFileName} ${fileCounter}.vcf`);
         await fs.writeFile(vcfFilePath, currentVcard.join('\n'));
         vcards.push(vcfFilePath);
         currentVcard = [];
-        fileCounter++;
+        fileCounter++; // Tambah fileCounter untuk penomoran file
       }
     }
 
@@ -266,6 +267,7 @@ END:VCARD
     }
   }
 }
+
 
 
 async function vcfToTxt(chatId) {
