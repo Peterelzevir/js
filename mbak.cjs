@@ -166,11 +166,8 @@ bot.on('message', async (msg) => {
                     const warningMessage = `⚠️ <b>PERINGATAN!</b> ⚠️\n\n` +
                         `👤 User: ${username}\n` +
                         `📝 Pelanggaran: Mengirim pesan lebih dari 4 baris\n` +
-                        `🔄 Peringatan ke-${groupStats[chatId].warningCount[userId]} dari 4\n` +
+                        `🔄 Peringatan ke ${groupStats[chatId].warningCount[userId]} dari 4\n\n` +
                         `⚡️ Sisa peringatan: ${warningsLeft}\n\n` +
-                        `<b>Perhatian:</b>\n` +
-                        `• Pesan lebih dari 4 baris akan dihapus\n` +
-                        `• Setelah 4 peringatan, Anda akan dibisukan\n\n` +
                         `<i>Mohon untuk mematuhi peraturan grup!</i>`;
 
                     bot.sendMessage(chatId, warningMessage, { parse_mode: 'HTML' });
@@ -193,7 +190,7 @@ bot.onText(/\/stats/, async (msg) => {
         return;
     }
 
-    if (!groupStats[chatId]) {
+    if (!groupStas[chatId]) {
         bot.sendMessage(chatId, '📊 Belum ada statistik untuk grup ini.');
         return;
     }
