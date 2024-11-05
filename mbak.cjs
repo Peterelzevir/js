@@ -168,7 +168,7 @@ bot.on('message', async (msg) => {
                         `⛔ Mengirim pesan lebih dari 4 baris\n` +
                         `📌 Peringatan ${groupStats[chatId].warningCount[userId]}/4 ( tersisa ${warningsLeft} )\n\n` +
                         `• Pesan >4 baris akan dihapus\n• 4 peringatan = Dibisukan\n\n` +
-                        `<i>Mohon untuk mematuhi peraturan grup!</i>`;
+                        `<i>Mohon patuhi aturan group!</i>`;
 
                     bot.sendMessage(chatId, warningMessage, { parse_mode: 'HTML' });
                 }
