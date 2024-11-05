@@ -194,6 +194,8 @@ bot.onText(/\/stats/, async (msg) => {
         bot.sendMessage(chatId, '📊 Belum ada statistik untuk grup ini.');
         return;
 
+    }
+
     // Rest of the code for stats handling...
 
     try {
