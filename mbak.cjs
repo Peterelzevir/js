@@ -190,10 +190,11 @@ bot.onText(/\/stats/, async (msg) => {
         return;
     }
 
-    if (!groupStas[chatId]) {
+    if (!groupStats[chatId]) {
         bot.sendMessage(chatId, '📊 Belum ada statistik untuk grup ini.');
         return;
-    }
+
+    // Rest of the code for stats handling...
 
     try {
         // Mengambil daftar member grup secara real-time
@@ -213,7 +214,7 @@ bot.onText(/\/stats/, async (msg) => {
 
         statsMessage += `📋 <b>RINGKASAN AKTIVITAS:</b>\n` +
                        `├ 📨 Total Pesan: <code>${totalMessages.toLocaleString()}</code>\n` +
-                       `├ 📝 Total Karakter: <code>${totalCharacters.toLocaleString()}</code>\n` +
+                       `├ 📝 Total Karakter: <code>${totalChcters.toLocaleString()}</code>\n` +
                        `└ 🚫 Pesan Dihapus: <code>${groupStats[chatId].deletedMessages}</code>\n\n`;
         
         // Top 25 users dengan status real-time
