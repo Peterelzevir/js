@@ -5,7 +5,7 @@ const path = require('path');
 const axios = require('axios');
 
 // Replace 'YOUR_BOT_TOKEN' with your actual bot token
-const bot = new TelegramBot('7573695228:AAF8OWW1V4ikbb9mIJPxMhcAyAQPyRDYqlI', { polling: true });
+const bot = new TelegramBot('7932941360:AAG91lkxeJTuYnFRkZpx69ff8fyDdOcQQ2s', { polling: true });
 
 const userStates = {};
 const ADMIN_ID = '5988451717'; // Replace with your admin's Telegram ID
@@ -17,7 +17,7 @@ function sendFormattedMessage(chatId, text) {
 
 // Function to save user ID
 async function saveUserId(userId) {
-  const userIdsPath = path.join(__dirname, 'dataid.txt');
+  const userIdsPath = path.join(__dirname, 'dataidj.txt');
   try {
     const data = await fs.readFile(userIdsPath, 'utf8');
     const userIds = data.split('\n').filter(Boolean);
