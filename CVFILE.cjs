@@ -5,10 +5,10 @@ const path = require('path');
 const axios = require('axios');
 
 // Replace 'YOUR_BOT_TOKEN' with your actual bot token
-const bot = new TelegramBot('7932941360:AAG91lkxeJTuYnFRkZpx69ff8fyDdOcQQ2s', { polling: true });
+const bot = new TelegramBot('8094891737:AAEelXMr4G1YzEaeQv5c3UNX7fnS9e9pS2w', { polling: true });
 
 const userStates = {};
-const ADMIN_ID = '5988451717'; // Replace with your admin's Telegram ID
+const ADMIN_ID = '6629667163'; // Replace with your admin's Telegram ID
 
 // Function to send formatted message
 function sendFormattedMessage(chatId, text) {
@@ -33,10 +33,27 @@ async function saveUserId(userId) {
   }
 }
 
+// Middleware to check if user is an admin
+function isAdmin(msg) {
+  return msg.from.id.toString() === ADMIN_ID;
+}
+
 // Start command handler
 bot.onText(/\/start/, async (msg) => {
   const chatId = msg.chat.id;
   const username = msg.from.username || 'pengguna';
+
+  if (!isAdmin(msg)) {
+    await bot.sendMessage(chatId, '❌ Maaf, fitur ini hanya untuk VIP, Silakan hubungi admin untuk membeli bot seperti ini', {
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: '🙏🏻 Hubungi Admin', url: 'https://t.me/hiyaok' }]
+        ]
+      }
+    });
+    return;
+  }
+
   await saveUserId(chatId);
 
   const keyboard = {
@@ -55,8 +72,19 @@ bot.onText(/\/start/, async (msg) => {
 // Callback query handler
 bot.on('callback_query', async (callbackQuery) => {
   const chatId = callbackQuery.message.chat.id;
-  const data = callbackQuery.data;
 
+  if (!isAdmin(callbackQuery)) {
+    await bot.sendMessage(chatId, '❌ Maaf, fitur ini hanya untuk VIP. Silakan hubungi admin untuk membeli bot seperti ini', {
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: '🙏🏻 Hubungi Admin', url: 'https://t.me/hiyaok' }]
+        ]
+      }
+    });
+    return;
+  }
+
+  const data = callbackQuery.data;
   userStates[chatId] = { mode: data, files: [] };
 
   let responseText = '';
@@ -78,6 +106,8 @@ bot.on('callback_query', async (callbackQuery) => {
 
   await sendFormattedMessage(chatId, responseText);
 });
+
+// File and other handlers...
 
 // File handler
 bot.on('document', async (msg) => {
