@@ -44,10 +44,10 @@ bot.onText(/\/start/, async (msg) => {
   const username = msg.from.username || 'pengguna';
 
   if (!isAdmin(msg)) {
-    await bot.sendMessage(chatId, '❌ Maaf, fitur ini hanya untuk VIP, Silakan hubungi admin untuk membeli bot seperti ini', {
+    await bot.sendMessage(chatId, '📢 Halo Kak Bot Fast Cv Permanent / Bulanan Ready\n\nSilakan hubungi admin untuk membeli bot seperti ini\n\n📢 Permanent Bot Hanya 320rb [ bisa nego! ]\n\n\nNotes : Keuntungan Beli Bot Bisa Tanyakan Kepada Dev ✅', {
       reply_markup: {
         inline_keyboard: [
-          [{ text: '🙏🏻 Hubungi Admin', url: 'https://t.me/hiyaok' }]
+          [{ text: '✅ Beli', url: 'https://t.me/hiyaok' }]
         ]
       }
     });
@@ -74,10 +74,10 @@ bot.on('callback_query', async (callbackQuery) => {
   const chatId = callbackQuery.message.chat.id;
 
   if (!isAdmin(callbackQuery)) {
-    await bot.sendMessage(chatId, '❌ Maaf, fitur ini hanya untuk VIP. Silakan hubungi admin untuk membeli bot seperti ini', {
+    await bot.sendMessage(chatId, '📢 Halo Kak Bot Fast Cv Permanent / Bulanan Ready\n\nSilakan hubungi admin untuk membeli bot seperti ini\n\n📢 Permanent Bot Hanya 320rb [ bisa nego! ]\n\n\nNotes : Keuntungan Beli Bot Bisa Tanyakan Kepada Dev ✅', {
       reply_markup: {
         inline_keyboard: [
-          [{ text: '🙏🏻 Hubungi Admin', url: 'https://t.me/hiyaok' }]
+          [{ text: 'Beli ✅', url: 'https://t.me/hiyaok' }]
         ]
       }
     });
