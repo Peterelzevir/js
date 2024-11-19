@@ -129,10 +129,9 @@ async function muteUser(chatId, userId, username, reason) {
 
 // Handler untuk pesan
 bot.on('message', async (msg) => {
-    if (msg.chat.type !== 'private' && msg.text) {
+    if (msg.chat.type !== 'private') { // Hanya proses pesan dalam grup
         const chatId = msg.chat.id;
         const userId = msg.from.id;
-        const messageLines = msg.text.split('\n').length;
 
         // Inisialisasi statistik grup jika belum ada
         if (!groupStats[chatId]) {
@@ -147,7 +146,7 @@ bot.on('message', async (msg) => {
         const chatMember = await bot.getChatMember(chatId, userId);
         const isAdmin = ['creator', 'administrator'].includes(chatMember.status);
 
-        // Update statistik pesan
+        // Update statistik pesan jika pengguna belum terdaftar
         if (!groupStats[chatId].messages[userId]) {
             groupStats[chatId].messages[userId] = {
                 count: 0,
@@ -156,59 +155,62 @@ bot.on('message', async (msg) => {
                 username: msg.from.username || msg.from.first_name
             };
         }
-        
+
         // Hitung waktu voice note jika ada
-        if (msg.voice) {
-            groupStats[chatId].messages[userId].voiceNoteDuration += msg.voice.duration; // durasi dalam detik
-        }
+        if (msg.voice) { // Pastikan objek msg memiliki properti voice
+           groupStats[chatId].messages[userId].voiceNoteDuration += msg.voice.duration; // durasi dalam detik
+       }
 
-        groupStats[chatId].messages[userId].count++;
-        groupStats[chatId].messages[userId].characters += msg.text.length;
+       // Update jumlah pesan dan karakter
+       groupStats[chatId].messages[userId].count++;
+       groupStats[chatId].messages[userId].characters += msg.text ? msg.text.length : 0; // Hanya tambahkan jika ada teks
 
-        // Cek jumlah baris untuk non-admin
-        if (!isAdmin && messageLines > 4) {
-            try {
-                // Hapus pesan yang melanggar
-                await bot.deleteMessage(chatId, msg.message_id);
-                groupStats[chatId].deletedMessages++;
+       // Cek jumlah baris untuk non-admin
+       const messageLines = msg.text ? msg.text.split('\n').length : 0; // Hitung baris pesan
 
-                // Update hitungan peringatan
-                if (!groupStats[chatId].warningCount[userId]) {
-                    groupStats[chatId].warningCount[userId] = 0;
-                }
-                groupStats[chatId].warningCount[userId]++;
+       if (!isAdmin && messageLines > 4) {
+           try {
+               // Hapus pesan yang melanggar
+               await bot.deleteMessage(chatId, msg.message_id);
+               groupStats[chatId].deletedMessages++;
 
-                const warningsLeft = 4 - groupStats[chatId].warningCount[userId];
-                const username = msg.from.username ? 
-                    `@${msg.from.username}` : 
-                    `<a href="tg://user?id=${userId}">${msg.from.first_name}</a>`;
+               // Update hitungan peringatan
+               if (!groupStats[chatId].warningCount[userId]) {
+                   groupStats[chatId].warningCount[userId] = 0;
+               }
+               groupStats[chatId].warningCount[userId]++;
 
-                if (groupStats[chatId].warningCount[userId] >= 4) {
-                    // Mute user setelah 4 peringatan
-                    await muteUser(chatId, userId, username, 'Melewati batas maksimum peringatan');
-                } else {
-                    // Kirim pesan peringatan
-                    const warningMessage = `⚠️ <b>PERINGATAN!</b> ⚠️\n` +
-                        `👤 ${username} lewat 4 baris` +
-                        `📌 Peringatan ${groupStats[chatId].warningCount[userId]}/4 ( tersisa ${warningsLeft} )\n` +
-                        `• 4 peringatan = Dibisukan\n`;
-                    await bot.sendMessage(chatId, warningMessage, { parse_mode: 'HTML' });
-                }
-            } catch (error) {
-                console.error('Error handling message:', error);
-            }
-        }
+               const warningsLeft = 4 - groupStats[chatId].warningCount[userId];
+               const username = msg.from.username ? 
+                   `@${msg.from.username}` : 
+                   `<a href="tg://user?id=${userId}">${msg.from.first_name}</a>`;
 
-        // Cek apakah pengguna sudah mengundang dua anggota baru sebelum bisa mengirim pesan
-        if (!isAdmin && Object.keys(groupStats[chatId].messages).length < 3) { // minimal ada admin + 2 anggota baru
-            await bot.deleteMessage(chatId, msg.message_id); // Hapus pesan
+               if (groupStats[chatId].warningCount[userId] >= 4) {
+                   // Mute user setelah 4 peringatan
+                   await muteUser(chatId, userId, username, 'Melewati batas maksimum peringatan');
+               } else {
+                   // Kirim pesan peringatan
+                   const warningMessage = `⚠️ <b>PERINGATAN!</b> ⚠️\n` +
+                       `👤 ${username} lewat 4 baris` +
+                       `📌 Peringatan ${groupStats[chatId].warningCount[userId]}/4 ( tersisa ${warningsLeft} )\n` +
+                       `• 4 peringatan = Dibisukan\n`;
+                   await bot.sendMessage(chatId, warningMessage, { parse_mode: 'HTML' });
+               }
+           } catch (error) {
+               console.error('Error handling message:', error);
+           }
+       }
 
-            const warningMessage = 
-              `▫️Akses Chat\n👋 Halo, ${msg.from.username || msg.from.first_name}! Untuk mulai chat, tambahkan 2 kontak ke grup ini.\n\nMalas menambahkan?\nBayar Rp20.000 ke admin dan nikmati chat gratis 2 bulan ke pemilik grup @prabu08 !\nPilih yang nyaman untukmu. Terima kasih! 😊`;
-              
-            await bot.sendMessage(chatId, warningMessage);
-        }
-    }
+       // Cek apakah pengguna sudah mengundang dua anggota baru sebelum bisa mengirim pesan
+       if (!isAdmin && Object.keys(groupStats[chatId].messages).length < 3) { // minimal ada admin + 2 anggota baru
+           await bot.deleteMessage(chatId, msg.message_id); // Hapus pesan
+
+           const warningMessage = 
+             `▫️Akses Chat\n👋 Halo, ${msg.from.username || msg.from.first_name}! Untuk mulai chat, tambahkan 2 kontak ke grup ini.\n\nMalas menambahkan?\nBayar Rp20.000 ke admin dan nikmati chat gratis 2 bulan ke pemilik grup @prabu08 !\nPilih yang nyaman untukmu. Terima kasih! 😊`;
+             
+           await bot.sendMessage(chatId, warningMessage);
+       }
+   }
 });
 
 // Handler untuk perintah statistik
@@ -226,13 +228,13 @@ bot.onText(/\/stats/, async (msg) => {
     }
 
     try {
-        // Mengambil daftar member grup secara real-time
-        const chatMembers = await bot.getChatAdministrators(chatId);
-        const adminIds = new Set(chatMembers.map(member => member.user.id));
+		// Mengambil daftar member grup secara real-time
+		const chatMembers = await bot.getChatAdministrators(chatId);
+		const adminIds = new Set(chatMembers.map(member => member.user.id));
 
-        // Update waktu real-time
-        const currentTime = moment().tz('Asia/Jakarta').format('DD/MM/YYYY HH:mm:ss');
-        
+		// Update waktu real-time
+		const currentTime = moment().tz('Asia/Jakarta').format('DD/MM/YYYY HH:mm:ss');
+		
 		let statsMessage = `📊 <b>Statistik Grup</b>\n⏰ <code>${currentTime} WIB</code>\n\n`;
 
 		// Hitung total statistik real-time
@@ -286,5 +288,4 @@ bot.onText(/\/stats/, async (msg) => {
     }
 });
 
-// ... (kode setelahnya tetap sama)
 console.log('Bot telah dijalankan!');
