@@ -19,7 +19,8 @@ function scheduleReset() {
             groupStats[groupId] = {
                 messages: {},
                 deletedMessages: 0,
-                warningCount: {}
+                warningCount: {},
+                invitedMembers: {} // Menyimpan anggota yang diundang
             };
         }
         scheduleReset();
@@ -98,6 +99,12 @@ bot.on('new_chat_members', async (msg) => {
             setTimeout(() => {
                 bot.deleteMessage(chatId, welcomeMsgResponse.message_id).catch(err => console.error('Error deleting welcome message:', err));
             }, 20 * 60 * 1000); // 20 menit dalam milidetik
+            
+            // Simpan informasi anggota baru yang diundang oleh pengguna
+            if (!groupStats[chatId].invitedMembers[msg.from.id]) {
+                groupStats[chatId].invitedMembers[msg.from.id] = 0;
+            }
+            groupStats[chatId].invitedMembers[msg.from.id]++;
         }
     }
 });
@@ -138,7 +145,8 @@ bot.on('message', async (msg) => {
             groupStats[chatId] = {
                 messages: {},
                 deletedMessages: 0,
-                warningCount: {}
+                warningCount: {},
+                invitedMembers: {}
             };
         }
 
@@ -202,11 +210,11 @@ bot.on('message', async (msg) => {
        }
 
        // Cek apakah pengguna sudah mengundang dua anggota baru sebelum bisa mengirim pesan
-       if (!isAdmin && Object.keys(groupStats[chatId].messages).length < 3) { // minimal ada admin + 2 anggota baru
+       if (!isAdmin && Object.keys(groupStats[chatId].invitedMembers).length < 2) { // minimal ada admin + 2 anggota baru
            await bot.deleteMessage(chatId, msg.message_id); // Hapus pesan
 
-           const warningMessage = 
-             `▫️Akses Chat\n👋 Halo, ${msg.from.username || msg.from.first_name}! Untuk mulai chat, tambahkan 2 kontak ke grup ini.\n\nMalas menambahkan?\nBayar Rp20.000 ke admin dan nikmati chat gratis 2 bulan ke pemilik grup @prabu08 !\nPilih yang nyaman untukmu. Terima kasih! 😊`;
+           const warningMessage =
+             `▫️Akses Chat\n👋 Halo, ${msg.from.username || msg.from.first_name}! Untuk mulai chat, tambahkan 2 kontak ke grup ini.\n\nTidak ingin menambahkan?\nBayar ke admin (@prabu08) dan nikmati akses chat gratis selama 2 bulan!\nPilih opsi yang paling nyaman untukmu. Terima kasih! 😊`;
              
            await bot.sendMessage(chatId, warningMessage);
        }
