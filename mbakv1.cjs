@@ -76,7 +76,7 @@ bot.on('new_chat_members', async (msg) => {
                     `1. Memiliki username\n` +
                     `2. Menghubungi admin grup</i>`;
 
-                bot.sendMessage(chatId, warningMsg, { parse_mode: 'HTML' });
+                await bot.sendMessage(chatId, warningMsg, { parse_mode: 'HTML' });
             } catch (error) {
                 console.error('Error restricting member:', error);
             }
@@ -92,11 +92,11 @@ bot.on('new_chat_members', async (msg) => {
                 `Sekali lagi, welcome aboard, dan semoga perjalanan belajar kamu di sini menyenangkan dan bermanfaat! 🚀\n\n` +
                 `Cheers, Prabu08`;
 
-            bot.sendMessage(chatId, welcomeMessage);
+            const welcomeMsgResponse = await bot.sendMessage(chatId, welcomeMessage);
             
             // Hapus pesan sambutan setelah 20 menit
             setTimeout(() => {
-                bot.deleteMessage(chatId, msg.message_id).catch(err => console.error('Error deleting welcome message:', err));
+                bot.deleteMessage(chatId, welcomeMsgResponse.message_id).catch(err => console.error('Error deleting welcome message:', err));
             }, 20 * 60 * 1000); // 20 menit dalam milidetik
         }
     }
@@ -121,7 +121,7 @@ async function muteUser(chatId, userId, username, reason) {
             `└ Mengirim pesan >4 baris sebanyak 4 kali\n\n` +
             `<i>Silakan hubungi admin grup untuk informasi lebih lanjut.</i>`;
 
-        bot.sendMessage(chatId, muteMessage, { parse_mode: 'HTML' });
+        await bot.sendMessage(chatId, muteMessage, { parse_mode: 'HTML' });
     } catch (error) {
         console.error('Error muting user:', error);
     }
@@ -192,7 +192,7 @@ bot.on('message', async (msg) => {
                         `👤 ${username} lewat 4 baris` +
                         `📌 Peringatan ${groupStats[chatId].warningCount[userId]}/4 ( tersisa ${warningsLeft} )\n` +
                         `• 4 peringatan = Dibisukan\n`;
-                    bot.sendMessage(chatId, warningMessage, { parse_mode: 'HTML' });
+                    await bot.sendMessage(chatId, warningMessage, { parse_mode: 'HTML' });
                 }
             } catch (error) {
                 console.error('Error handling message:', error);
@@ -206,7 +206,7 @@ bot.on('message', async (msg) => {
             const warningMessage = 
               `▫️Akses Chat\n👋 Halo, ${msg.from.username || msg.from.first_name}! Untuk mulai chat, tambahkan 2 kontak ke grup ini.\n\nMalas menambahkan?\nBayar Rp20.000 ke admin dan nikmati chat gratis 2 bulan ke pemilik grup @prabu08 !\nPilih yang nyaman untukmu. Terima kasih! 😊`;
               
-            bot.sendMessage(chatId, warningMessage);
+            await bot.sendMessage(chatId, warningMessage);
         }
     }
 });
@@ -216,12 +216,12 @@ bot.onText(/\/stats/, async (msg) => {
     const chatId = msg.chat.id;
     
     if (msg.chat.type === 'private') {
-        bot.sendMessage(chatId, '❌ Perintah ini hanya bisa digunakan di dalam grup!');
+        await bot.sendMessage(chatId, '❌ Perintah ini hanya bisa digunakan di dalam grup!');
         return;
     }
 
     if (!groupStats[chatId]) {
-        bot.sendMessage(chatId, '📊 Belum ada statistik untuk grup ini.');
+        await bot.sendMessage(chatId, '📊 Belum ada statistik untuk grup ini.');
         return;
     }
 
@@ -278,7 +278,7 @@ bot.onText(/\/stats/, async (msg) => {
 
     } catch (error) {
 	    console.error('Error generating stats:', error);
-	    bot.sendMessage(
+	    await bot.sendMessage(
 		    chatId,
 		    '❌ Terjadi kesalahan saat mengambil statistik.\nSilakan coba lagi nanti.',
 		    { parse_mode: 'HTML' }
