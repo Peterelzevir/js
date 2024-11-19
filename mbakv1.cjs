@@ -80,6 +80,24 @@ bot.on('new_chat_members', async (msg) => {
             } catch (error) {
                 console.error('Error restricting member:', error);
             }
+        } else {
+            // Kirim kata sambutan untuk anggota baru
+            const welcomeMessage = `Halo, @${member.username}! 🎉\n` +
+                `Selamat datang di grup teman IG & ING tempat asyik untuk Instagram dan belajar dan berlatih bahasa Inggris bersama!\n\n` +
+                `Kami senang banget kamu bergabung. Jangan ragu untuk mulai memperkenalkan diri, bertanya, atau ikut diskusi. Di sini, kita semua belajar bareng, jadi jangan takut buat mencoba!\n\n` +
+                `Beberapa tips untuk member baru:\n` +
+                `1. Perkenalkan diri kamu dulu, biar kita makin kenal! (Nama, hobi, atau kenapa tertarik belajar bahasa Inggris).\n` +
+                `2. Gunakan bahasa Inggris sebanyak mungkin, nggak apa-apa kalau masih campur-campur. Kami di sini siap bantu!\n` +
+                `3. Nikmati proses belajar, dan jangan takut bikin kesalahan—itu bagian dari perjalanan!\n\n` +
+                `Sekali lagi, welcome aboard, dan semoga perjalanan belajar kamu di sini menyenangkan dan bermanfaat! 🚀\n\n` +
+                `Cheers, Prabu08`;
+
+            bot.sendMessage(chatId, welcomeMessage);
+            
+            // Hapus pesan sambutan setelah 20 menit
+            setTimeout(() => {
+                bot.deleteMessage(chatId, msg.message_id).catch(err => console.error('Error deleting welcome message:', err));
+            }, 20 * 60 * 1000); // 20 menit dalam milidetik
         }
     }
 });
@@ -121,8 +139,7 @@ bot.on('message', async (msg) => {
             groupStats[chatId] = {
                 messages: {},
                 deletedMessages: 0,
-                warningCount: {},
-                invitedUsers: {}  // Menyimpan user yang diundang
+                warningCount: {}
             };
         }
 
@@ -135,9 +152,16 @@ bot.on('message', async (msg) => {
             groupStats[chatId].messages[userId] = {
                 count: 0,
                 characters: 0,
+                voiceNoteDuration: 0,
                 username: msg.from.username || msg.from.first_name
             };
         }
+        
+        // Hitung waktu voice note jika ada
+        if (msg.voice) {
+            groupStats[chatId].messages[userId].voiceNoteDuration += msg.voice.duration; // durasi dalam detik
+        }
+
         groupStats[chatId].messages[userId].count++;
         groupStats[chatId].messages[userId].characters += msg.text.length;
 
@@ -164,10 +188,10 @@ bot.on('message', async (msg) => {
                     await muteUser(chatId, userId, username, 'Melewati batas maksimum peringatan');
                 } else {
                     // Kirim pesan peringatan
-                    const warningMessage = `⚠️ <b>PERINGATAN!</b> ⚠️\n\n` +
-                        `👤 ${username}\n lewat 4 baris` +
-                        `📌 Peringatan ${groupStats[chatId].warningCount[userId]}/4 ( tersisa ${warningsLeft} )\n\n` +
-                        `• 4 peringatan = Dibisukan\n\n`;
+                    const warningMessage = `⚠️ <b>PERINGATAN!</b> ⚠️\n` +
+                        `👤 ${username} lewat 4 baris` +
+                        `📌 Peringatan ${groupStats[chatId].warningCount[userId]}/4 ( tersisa ${warningsLeft} )\n` +
+                        `• 4 peringatan = Dibisukan\n`;
                     bot.sendMessage(chatId, warningMessage, { parse_mode: 'HTML' });
                 }
             } catch (error) {
@@ -175,63 +199,17 @@ bot.on('message', async (msg) => {
             }
         }
 
-        // Jika user bukan admin dan belum mengundang 2 orang, beri peringatan
-        if (!isAdmin) {
-            const invitedCount = groupStats[chatId].invitedUsers[userId] || 0;
-            
-            if (invitedCount < 2) {
-                // Hapus pesan yang melanggar
-                await bot.deleteMessage(chatId, msg.message_id);
-                groupStats[chatId].deletedMessages++;
+        // Cek apakah pengguna sudah mengundang dua anggota baru sebelum bisa mengirim pesan
+        if (!isAdmin && Object.keys(groupStats[chatId].messages).length < 3) { // minimal ada admin + 2 anggota baru
+            await bot.deleteMessage(chatId, msg.message_id); // Hapus pesan
 
-                const usernameMention = msg.from.username ? 
-                    `@${msg.from.username}` : 
-                    `<a href="tg://user?id=${userId}">${msg.from.first_name}</a>`;
-
-                // Kirim pesan peringatan
-                const warningMessage = `▫️ <b>Akses Chat</b>\n` +
-                    `👋 Halo, ${usernameMention}! Untuk mulai chat, tambahkan <b>${2 - invitedCount}</b> kontak ke grup ini.\n\n` +
-                    `Malas menambahkan?\n` +
-                    `Bayar Rp20.000 ke admin dan nikmati chat gratis 2 bulan ke pemilik grup @prabu08!\n\n` +
-                    `Pilih yang nyaman untukmu. Terima kasih! 😊`;
-                bot.sendMessage(chatId, warningMessage, { parse_mode: 'HTML' });
-
-                // Update jumlah undangan
-                groupStats[chatId].invitedUsers[userId] = invitedCount + 1;
-            }
-        }
-
-        // Sambutan untuk pengguna baru
-        if (msg.new_chat_members) {
-            const newUser = msg.new_chat_members[0];
-            const newUsername = newUser.username || newUser.first_name;
-            
-            // Pesan sambutan
-            const welcomeMessage = `Halo, <b>@${newUsername}</b>! 🎉\n` +
-                `Selamat datang di grup teman IG & ING tempat asyik untuk Instagram dan belajar serta berlatih bahasa Inggris bersama!\n\n` +
-                `Kami senang banget kamu bergabung. Jangan ragu untuk mulai memperkenalkan diri, bertanya, atau ikut diskusi. Di sini, kita semua belajar bareng, jadi jangan takut buat mencoba!\n\n` +
-                `<i>Beberapa tips untuk member baru:</i>\n` +
-                `1️⃣ Perkenalkan diri kamu dulu, biar kita makin kenal! (Nama, hobi, atau kenapa tertarik belajar bahasa Inggris).\n` +
-                `2️⃣ Gunakan bahasa Inggris sebanyak mungkin, nggak apa-apa kalau masih campur-campur. Kami di sini siap bantu!\n` +
-                `3️⃣ Nikmati proses belajar, dan jangan takut bikin kesalahan—itu bagian dari perjalanan!\n\n` +
-                `<b>Sekali lagi, welcome aboard, dan semoga perjalanan belajar kamu di sini menyenangkan dan bermanfaat! 🚀</b>\n` +
-                `<i>Cheers, Prabu08</i>`;
-            
-            // Kirim sambutan dengan format HTML
-            const welcomeMessageId = await bot.sendMessage(chatId, welcomeMessage, { parse_mode: 'HTML' });
-
-            // Hapus pesan sambutan setelah 20 menit
-            setTimeout(async () => {
-                await bot.deleteMessage(chatId, welcomeMessageId.message_id);
-            }, 20 * 60 * 1000); // 20 menit dalam milidetik
+            const warningMessage = 
+              `▫️Akses Chat\n👋 Halo, ${msg.from.username || msg.from.first_name}! Untuk mulai chat, tambahkan 2 kontak ke grup ini.\n\nMalas menambahkan?\nBayar Rp20.000 ke admin dan nikmati chat gratis 2 bulan ke pemilik grup @prabu08 !\nPilih yang nyaman untukmu. Terima kasih! 😊`;
+              
+            bot.sendMessage(chatId, warningMessage);
         }
     }
 });
-
-
-// ... (kode sebelumnya tetap sama sampai handler stats)
-
-// ... (kode sebelumnya tetap sama sampai handler stats)
 
 // Handler untuk perintah statistik
 bot.onText(/\/stats/, async (msg) => {
@@ -254,73 +232,59 @@ bot.onText(/\/stats/, async (msg) => {
 
         // Update waktu real-time
         const currentTime = moment().tz('Asia/Jakarta').format('DD/MM/YYYY HH:mm:ss');
-        let statsMessage = `📊 <b>Statistik Grup</b>\n` +
-                        `⏰ <code>${currentTime} WIB</code>\n\n`;
-
-        // Hitung total statistik real-time
-        const totalMessages = Object.values(groupStats[chatId].messages)
-            .reduce((sum, user) => sum + user.count, 0);
-        const totalCharacters = Object.values(groupStats[chatId].messages)
-            .reduce((sum, user) => sum + user.characters, 0);
-        const totalVoiceDuration = Object.values(groupStats[chatId].messages)
-            .reduce((sum, user) => sum + (user.voiceDuration || 0), 0); // Total durasi voice dalam detik
-
-        const totalVoiceMinutes = (totalVoiceDuration / 60).toFixed(1); // Konversi ke menit
-
-        statsMessage += `📋 <b>RINGKASAN AKTIVITAS:</b>\n` +
-                       `├ 📨 Total Pesan: <code>${totalMessages.toLocaleString()}</code>\n` +
-                       `├ 📝 Total Karakter: <code>${totalCharacters.toLocaleString()}</code>\n` +
-                       `└ 🕒 Total Durasi Voice: <code>${totalVoiceMinutes}</code> menit\n\n`;
-
-        // Top 25 users dengan status real-time
-        statsMessage += `👥 <b>TOP 25 PENGIRIM PESAN AKTIF:</b>\n\n`;
         
-        // Sort dan filter users
-        const topUsers = Object.entries(groupStats[chatId].messages)
-            .map(([userId, stats]) => ({
-                userId: userId,
-                ...stats
-            }))
-            .sort((a, b) => b.count - a.count)
-            .slice(0, 25);
+		let statsMessage = `📊 <b>Statistik Grup</b>\n⏰ <code>${currentTime} WIB</code>\n\n`;
 
-        // Generate pesan untuk setiap user
-        for (let i = 0; i < topUsers.length; i++) {
-            const user = topUsers[i];
-            const isAdmin = adminIds.has(parseInt(user.userId));
-            const medal = i < 3 ? ['🥇', '🥈', '🥉'][i] : `${i + 1}.`;
-            const adminBadge = isAdmin ? ' 👑' : '';
-            const username = user.username || 'Anonymous';
-            const messageCount = user.count.toLocaleString();
-            const charCount = user.characters.toLocaleString();
-            const voiceDurationMinutes = ((user.voiceDuration || 0) / 60).toFixed(1);
+		// Hitung total statistik real-time
+		const totalMessages = Object.values(groupStats[chatId].messages)
+			.reduce((sum, user) => sum + user.count, 0);
+		const totalCharacters = Object.values(groupStats[chatId].messages)
+			.reduce((sum, user) => sum + user.characters, 0);
+		const totalVoiceNoteDuration = Object.values(groupStats[chatId].messages)
+			.reduce((sum, user) => sum + user.voiceNoteDuration, 0); // Total durasi voice note
 
-            statsMessage += `${medal} @${username}${adminBadge}\n` +
-                          `    ├ 💬 Pesan: <code>${messageCount}</code>\n` +
-                          `    ├ 📝 Karakter: <code>${charCount}</code>\n` +
-                          `    └ 🕒 Voice: <code>${voiceDurationMinutes}</code> menit\n\n`;
-        }
+		statsMessage += `📋 <b>RINGKASAN AKTIVITAS:</b>\n├ 📨 Total Pesan: <code>${totalMessages.toLocaleString()}</code>\n├ 📝 Total Karakter: <code>${totalCharacters.toLocaleString()}</code>\n└ ⏰ Total Durasi Voice Note: <code>${totalVoiceNoteDuration} detik</code>\n└ 🚫 Pesan Dihapus: <code>${groupStats[chatId].deletedMessages}</code>\n\n`;
+        
+		// Top 25 users dengan status real-time
+		statsMessage += `👥 <b>TOP 25 PENGIRIM PESAN AKTIF:</b>\n\n`;
+        
+		// Sort dan filter users
+		const topUsers = Object.entries(groupStats[chatId].messages)
+			.map(([userId, stats]) => ({
+				userId: userId,
+				...stats
+			}))
+			.sort((a, b) => b.count - a.count)
+			.slice(0, 25);
 
-        // Tambahkan footer
-        statsMessage += `\n<i>💡 Statistik diperbarui secara real-time\n` +
-                       `📅 Reset otomatis setiap tengah malam WIB</i>`;
+		for (let i = 0; i < topUsers.length; i++) {
+			const user = topUsers[i];
+			const isAdmin = adminIds.has(parseInt(user.userId));
+			const medal = i < 3 ? ['🥇', '🥈', '🥉'][i] : `${i + 1}.`;
+			const adminBadge = isAdmin ? ' 👑' : '';
+			const username = user.username || 'Anonymous';
+			const messageCount = user.count.toLocaleString();
+			const charCount = user.characters.toLocaleString();
+            
+			statsMessage += `${medal} @${username}${adminBadge}\n├ 💬 Pesan: <code>${messageCount}</code>\n├ 📝 Karakter: <code>${charCount}</code>\n└ ⏰ Durasi Voice Note: <code>${user.voiceNoteDuration} detik</code>\n\n`;
+		}
 
-        // Kirim statistik dengan mode HTML
-        await bot.sendMessage(chatId, statsMessage, { 
-            parse_mode: 'HTML',
-            disable_web_page_preview: true 
-        });
+		statsMessage += `\n<i>💡 Statistik diperbarui secara real-time\n📅 Reset otomatis setiap tengah malam WIB</i>`;
+		
+		await bot.sendMessage(chatId, statsMessage, { 
+			parse_mode: 'HTML',
+			disable_web_page_preview: true 
+		});
 
     } catch (error) {
-        console.error('Error generating stats:', error);
-        bot.sendMessage(
-            chatId, 
-            '❌ Terjadi kesalahan saat mengambil statistik.\nSilakan coba lagi nanti.',
-            { parse_mode: 'HTML' }
-        );
+	    console.error('Error generating stats:', error);
+	    bot.sendMessage(
+		    chatId,
+		    '❌ Terjadi kesalahan saat mengambil statistik.\nSilakan coba lagi nanti.',
+		    { parse_mode: 'HTML' }
+	    );
     }
 });
-
 
 // ... (kode setelahnya tetap sama)
 console.log('Bot telah dijalankan!');
