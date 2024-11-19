@@ -163,10 +163,10 @@ bot.on('message', async (msg) => {
                     await muteUser(chatId, userId, username, 'Melewati batas maksimum peringatan');
                 } else {
                     // Kirim pesan peringatan
-                    const warningMessage = `⚠️ <b>PERINGATAN!</b> ⚠️\n\n` +
-                        `👤 ${username}\n lewat 4 baris` +
-                        `📌 Peringatan ${groupStats[chatId].warningCount[userId]}/4 ( tersisa ${warningsLeft} )\n\n` +
-                        `• 4 peringatan = Dibisukan\n\n`;
+                    const warningMessage = `⚠️ <b>PERINGATAN!</b> ⚠️\n` +
+                        `👤 ${username} lewat 4 baris` +
+                        `📌 Peringatan ${groupStats[chatId].warningCount[userId]}/4 ( tersisa ${warningsLeft} )\n` +
+                        `• 4 peringatan = Dibisukan\n`;
                     bot.sendMessage(chatId, warningMessage, { parse_mode: 'HTML' });
                 }
             } catch (error) {
