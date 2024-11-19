@@ -35,7 +35,7 @@ bot.onText(/\/start/, (msg) => {
     const opts = {
         reply_markup: {
             inline_keyboard: [
-                [{ text: '🌟 Join Our Group 🌟', url: 'https://t.me/hiyaok' }]
+                [{ text: '🌟 Buy Program Bot 🌟', url: 'https://t.me/hiyaok' }]
             ]
         },
         parse_mode: 'HTML'
@@ -96,7 +96,7 @@ async function muteUser(chatId, userId, username, reason) {
         });
 
         const muteMessage = `⛔️ <b>PENGGUNA DIBISUKAN</b> ⛔️\n\n` +
-            `👤 User: <code>${username}</code>\n` +
+            `👤 <code>${username}</code> lewat 4 baris\n` +
             `⚠️ Alasan: ${reason}\n` +
             `⏱ Durasi: 24 jam\n\n` +
             `<b>Riwayat Pelanggaran:</b>\n` +
@@ -164,12 +164,9 @@ bot.on('message', async (msg) => {
                 } else {
                     // Kirim pesan peringatan
                     const warningMessage = `⚠️ <b>PERINGATAN!</b> ⚠️\n\n` +
-                        `👤 ${username}\n` +
-                        `⛔ Mengirim pesan lebih dari 4 baris\n` +
+                        `👤 ${username}\n lewat 4 baris` +
                         `📌 Peringatan ${groupStats[chatId].warningCount[userId]}/4 ( tersisa ${warningsLeft} )\n\n` +
-                        `• Pesan >4 baris akan dihapus\n• 4 peringatan = Dibisukan\n\n` +
-                        `<i>Mohon patuhi aturan group!</i>`;
-
+                        `• 4 peringatan = Dibisukan\n\n`;
                     bot.sendMessage(chatId, warningMessage, { parse_mode: 'HTML' });
                 }
             } catch (error) {
