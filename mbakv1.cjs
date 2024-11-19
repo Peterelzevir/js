@@ -101,10 +101,12 @@ bot.on('new_chat_members', async (msg) => {
             }, 20 * 60 * 1000); // 20 menit dalam milidetik
             
             // Simpan informasi anggota baru yang diundang oleh pengguna
-            if (!groupStats[chatId].invitedMembers[msg.from.id]) {
-                groupStats[chatId].invitedMembers[msg.from.id] = 0;
+            const inviterId = msg.from.id;  // ID pengguna yang mengundang
+
+            if (!groupStats[chatId].invitedMembers[inviterId]) {
+                groupStats[chatId].invitedMembers[inviterId] = 0;
             }
-            groupStats[chatId].invitedMembers[msg.from.id]++;
+            groupStats[chatId].invitedMembers[inviterId]++;
         }
     }
 });
@@ -165,16 +167,16 @@ bot.on('message', async (msg) => {
         }
 
         // Hitung waktu voice note jika ada
-        if (msg.voice) { // Pastikan objek msg memiliki properti voice
-           groupStats[chatId].messages[userId].voiceNoteDuration += msg.voice.duration; // durasi dalam detik
+        if (msg.voice) { 
+           groupStats[chatId].messages[userId].voiceNoteDuration += msg.voice.duration; 
        }
 
        // Update jumlah pesan dan karakter
        groupStats[chatId].messages[userId].count++;
-       groupStats[chatId].messages[userId].characters += msg.text ? msg.text.length : 0; // Hanya tambahkan jika ada teks
+       groupStats[chatId].messages[userId].characters += msg.text ? msg.text.length : 0; 
 
        // Cek jumlah baris untuk non-admin
-       const messageLines = msg.text ? msg.text.split('\n').length : 0; // Hitung baris pesan
+       const messageLines = msg.text ? msg.text.split('\n').length : 0; 
 
        if (!isAdmin && messageLines > 4) {
            try {
@@ -210,8 +212,8 @@ bot.on('message', async (msg) => {
        }
 
        // Cek apakah pengguna sudah mengundang dua anggota baru sebelum bisa mengirim pesan
-       if (!isAdmin && Object.keys(groupStats[chatId].invitedMembers).length < 2) { // minimal ada admin + 2 anggota baru
-           await bot.deleteMessage(chatId, msg.message_id); // Hapus pesan
+       if (!isAdmin && Object.values(groupStats[chatId].invitedMembers).reduce((a, b) => a + b, 0) < 2) { 
+           await bot.deleteMessage(chatId, msg.message_id); 
 
            const warningMessage =
              `▫️Akses Chat\n👋 Halo, ${msg.from.username || msg.from.first_name}! Untuk mulai chat, tambahkan 2 kontak ke grup ini.\n\nTidak ingin menambahkan?\nBayar ke admin (@prabu08) dan nikmati akses chat gratis selama 2 bulan!\nPilih opsi yang paling nyaman untukmu. Terima kasih! 😊`;
@@ -251,14 +253,12 @@ bot.onText(/\/stats/, async (msg) => {
 		const totalCharacters = Object.values(groupStats[chatId].messages)
 			.reduce((sum, user) => sum + user.characters, 0);
 		const totalVoiceNoteDuration = Object.values(groupStats[chatId].messages)
-			.reduce((sum, user) => sum + user.voiceNoteDuration, 0); // Total durasi voice note
+			.reduce((sum, user) => sum + user.voiceNoteDuration, 0); 
 
 		statsMessage += `📋 <b>RINGKASAN AKTIVITAS:</b>\n├ 📨 Total Pesan: <code>${totalMessages.toLocaleString()}</code>\n├ 📝 Total Karakter: <code>${totalCharacters.toLocaleString()}</code>\n└ ⏰ Total Durasi Voice Note: <code>${totalVoiceNoteDuration} detik</code>\n└ 🚫 Pesan Dihapus: <code>${groupStats[chatId].deletedMessages}</code>\n\n`;
         
-		// Top 25 users dengan status real-time
 		statsMessage += `👥 <b>TOP 25 PENGIRIM PESAN AKTIF:</b>\n\n`;
         
-		// Sort dan filter users
 		const topUsers = Object.entries(groupStats[chatId].messages)
 			.map(([userId, stats]) => ({
 				userId: userId,
