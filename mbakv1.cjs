@@ -199,12 +199,16 @@ bot.on('message', async (msg) => {
                    // Mute user setelah 4 peringatan
                    await muteUser(chatId, userId, username, 'Melewati batas maksimum peringatan');
                } else {
-                   // Kirim pesan peringatan
+                   // Kirim pesan peringatan dan hapus setelah 20 detik
                    const warningMessage = `⚠️ <b>PERINGATAN!</b> ⚠️\n` +
                        `👤 ${username} lewat 4 baris` +
                        `📌 Peringatan ${groupStats[chatId].warningCount[userId]}/4 ( tersisa ${warningsLeft} )\n` +
                        `• 4 peringatan = Dibisukan\n`;
-                   await bot.sendMessage(chatId, warningMessage, { parse_mode: 'HTML' });
+                   const sentWarningMsg = await bot.sendMessage(chatId, warningMessage, { parse_mode: 'HTML' });
+                   
+                   setTimeout(() => {
+                       bot.deleteMessage(chatId, sentWarningMsg.message_id).catch(err => console.error('Error deleting warning message:', err));
+                   }, 20 * 1000); // Hapus setelah 20 detik
                }
            } catch (error) {
                console.error('Error handling message:', error);
@@ -212,13 +216,18 @@ bot.on('message', async (msg) => {
        }
 
        // Cek apakah pengguna sudah mengundang dua anggota baru sebelum bisa mengirim pesan
-       if (!isAdmin && Object.values(groupStats[chatId].invitedMembers).filter(count => count >= 2).length === 0) { 
+       if (!isAdmin && groupStats[chatId].invitedMembers[userId] < 2) { 
            await bot.deleteMessage(chatId, msg.message_id); 
 
            const warningMessage =
              `▫️Akses Chat\n👋 Halo, ${msg.from.username || msg.from.first_name}! Untuk mulai chat, tambahkan minimal 2 kontak ke grup ini.\n\nTidak ingin menambahkan?\nBayar ke admin (@prabu08) dan nikmati akses chat gratis selama 2 bulan!\nPilih opsi yang paling nyaman untukmu. Terima kasih! 😊`;
              
-           await bot.sendMessage(chatId, warningMessage);
+           const sentWarningMsg = await bot.sendMessage(chatId, warningMessage);
+           
+           // Hapus pesan peringatan setelah 20 detik
+           setTimeout(() => {
+               bot.deleteMessage(chatId, sentWarningMsg.message_id).catch(err => console.error('Error deleting access warning message:', err));
+           }, 20 * 1000); // Hapus setelah 20 detik
        }
    }
 });
