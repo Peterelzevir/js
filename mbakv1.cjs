@@ -20,7 +20,7 @@ function scheduleReset() {
                 messages: {},
                 deletedMessages: 0,
                 warningCount: {},
-                invitedMembers: {} // Menyimpan anggota yang diundang
+                invitedMembers: {} // Menyimpan anggota yang diundang per user
             };
         }
         scheduleReset();
@@ -148,7 +148,7 @@ bot.on('message', async (msg) => {
                 messages: {},
                 deletedMessages: 0,
                 warningCount: {},
-                invitedMembers: {}
+                invitedMembers: {} // Menyimpan anggota yang diundang per user
             };
         }
 
@@ -212,11 +212,11 @@ bot.on('message', async (msg) => {
        }
 
        // Cek apakah pengguna sudah mengundang dua anggota baru sebelum bisa mengirim pesan
-       if (!isAdmin && Object.values(groupStats[chatId].invitedMembers).reduce((a, b) => a + b, 0) < 2) { 
+       if (!isAdmin && Object.values(groupStats[chatId].invitedMembers).filter(count => count >= 2).length === 0) { 
            await bot.deleteMessage(chatId, msg.message_id); 
 
            const warningMessage =
-             `▫️Akses Chat\n👋 Halo, ${msg.from.username || msg.from.first_name}! Untuk mulai chat, tambahkan 2 kontak ke grup ini.\n\nTidak ingin menambahkan?\nBayar ke admin (@prabu08) dan nikmati akses chat gratis selama 2 bulan!\nPilih opsi yang paling nyaman untukmu. Terima kasih! 😊`;
+             `▫️Akses Chat\n👋 Halo, ${msg.from.username || msg.from.first_name}! Untuk mulai chat, tambahkan minimal 2 kontak ke grup ini.\n\nTidak ingin menambahkan?\nBayar ke admin (@prabu08) dan nikmati akses chat gratis selama 2 bulan!\nPilih opsi yang paling nyaman untukmu. Terima kasih! 😊`;
              
            await bot.sendMessage(chatId, warningMessage);
        }
