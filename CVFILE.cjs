@@ -44,7 +44,7 @@ bot.onText(/\/start/, async (msg) => {
   const username = msg.from.username || 'pengguna';
 
   if (!isAdmin(msg)) {
-    await bot.sendMessage(chatId, '📢 Halo Kak Bot Fast Cv Permanent / Bulanan Ready\n\nSilakan hubungi admin untuk membeli bot seperti ini\n📢 Permanent Bot Hanya 320rb [ bisa nego! ]\n\n\nNotes : Keuntungan Bot Cv Rapih - Super Fast - Anti Delay & Bisa Cv File Banyak Sekaligus ✅', {
+    await bot.sendMessage(chatId, '📢 Halo Kak Bot Fast Cv Permanent / Bulanan Ready\n\n☑️ Silakan hubungi admin untuk membeli bot seperti ini 😆\n\n📢 Permanent Bot Hanya 320rb [ bisa nego! ] ✅\n\n\n🙏🏻 Notes : Keuntungan Bot Cv Rapih - Super Fast - Anti Delay & Bisa Cv File Banyak Sekaligus ✅', {
       reply_markup: {
         inline_keyboard: [
           [{ text: '✅ Beli', url: 'https://t.me/hiyaok' }]
