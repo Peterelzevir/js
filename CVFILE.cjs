@@ -5,10 +5,10 @@ const path = require('path');
 const axios = require('axios');
 
 // Replace 'YOUR_BOT_TOKEN' with your actual bot token
-const bot = new TelegramBot('8094891737:AAEelXMr4G1YzEaeQv5c3UNX7fnS9e9pS2w', { polling: true });
+const bot = new TelegramBot('7329081018:AAH56cF2bm5O9nxfOFJHAM4nIkEr9BMyfzE', { polling: true });
 
 const userStates = {};
-const ADMIN_ID = '6629667163'; // Replace with your admin's Telegram ID
+const ADMIN_ID = '7281335942'; // Replace with your admin's Telegram ID
 
 // Function to send formatted message
 function sendFormattedMessage(chatId, text) {
@@ -44,7 +44,7 @@ bot.onText(/\/start/, async (msg) => {
   const username = msg.from.username || 'pengguna';
 
   if (!isAdmin(msg)) {
-    await bot.sendMessage(chatId, '📢 Halo Kak Bot Fast Cv Permanent / Bulanan Ready\n\nSilakan hubungi admin untuk membeli bot seperti ini\n\n📢 Permanent Bot Hanya 320rb [ bisa nego! ]\n\n\nNotes : Keuntungan Beli Bot Bisa Tanyakan Kepada Dev ✅', {
+    await bot.sendMessage(chatId, '📢 Halo Kak Bot Fast Cv Permanent / Bulanan Ready\n\nSilakan hubungi admin untuk membeli bot seperti ini\n📢 Permanent Bot Hanya 320rb [ bisa nego! ]\n\n\nNotes : Keuntungan Bot Cv Rapih - Super Fast - Anti Delay & Bisa Cv File Banyak Sekaligus ✅', {
       reply_markup: {
         inline_keyboard: [
           [{ text: '✅ Beli', url: 'https://t.me/hiyaok' }]
