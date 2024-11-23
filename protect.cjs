@@ -109,7 +109,7 @@ bot.onText(/\/start(.+)?/, async (msg, match) => {
     }
 
     // Pesan start normal jika bukan verifikasi
-    await bot.sendMessage(chatId, `🙌 Halo ${username} saya adalah bot proteksi grup\n\n🙏🏻 kirimkan pesan /help untuk bantuan`, {
+    await bot.sendMessage(chatId, `🙌 halo ${username}\n👀 saya adalah bot proteksi grup ✅\n\n🙏🏻 kirimkan pesan /help untuk bantuan`, {
         parse_mode: 'Markdown',
         reply_markup: {
             inline_keyboard: [[
