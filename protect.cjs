@@ -14,6 +14,7 @@ const adminBotIds = [5988451717]; // Replace with actual admin IDs
 // File paths
 const ID_FILE = 'id.json';
 const DATA_USER_FILE = 'DataUser.json';
+const GROUPS_ID = 'groups.json';
 
 // Initialize data files if they don't exist
 if (!fs.existsSync(ID_FILE)) {
@@ -21,6 +22,9 @@ if (!fs.existsSync(ID_FILE)) {
 }
 if (!fs.existsSync(DATA_USER_FILE)) {
     fs.writeFileSync(DATA_USER_FILE, JSON.stringify({}));
+}
+if (!fs.existsSync(GROUPS_ID)) {
+    fs.writeFileSync(GROUPS_ID, JSON.stringify({}));
 }
 
 // Helper Functions
