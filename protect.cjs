@@ -57,10 +57,6 @@ const updateUserData = (msg) => {
     saveData('id.json', userData);
 };
 
-const saveData = (file, data) => {
-    fs.writeFileSync(file, JSON.stringify(data, null, 2));
-};
-
 const getFormattedTime = () => {
     return moment().tz('Asia/Jakarta').format('DD/MM/YYYY HH:mm:ss [WIB]');
 };
