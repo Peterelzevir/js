@@ -15,6 +15,7 @@ const adminBotIds = [5988451717]; // Replace with actual admin IDs
 const ID_FILE = 'id.json';
 const DATA_USER_FILE = 'DataUser.json';
 const GROUPS_ID = 'groups.json';
+const Temp_ID = 'temp_verify.json';
 
 // Initialize data files if they don't exist
 if (!fs.existsSync(ID_FILE)) {
@@ -26,6 +27,10 @@ if (!fs.existsSync(DATA_USER_FILE)) {
 if (!fs.existsSync(GROUPS_ID)) {
     fs.writeFileSync(GROUPS_ID, JSON.stringify({}));
 }
+if (!fs.existsSync(Temp_ID)) {
+    fs.writeFileSync(Temp_ID, JSON.stringify({}));
+}
+
 
 // Helper Functions
 const loadData = (file) => {
@@ -69,8 +74,9 @@ bot.on('new_chat_members', async (msg) => {
     }
 });
 
-// Start command handler yang diupdate
-bot.onText(/\/start(.+)?/, async (msg, match) => {
+
+ // Start command handler yang diupdate
+bot.onText(/\/start(?:\s+(.+))?/, async (msg, match) => {
     const chatId = msg.chat.id;
     const username = msg.from.username ? `@${msg.from.username}` : msg.from.first_name;
     
@@ -92,44 +98,91 @@ bot.onText(/\/start(.+)?/, async (msg, match) => {
     saveData(ID_FILE, userData);
 
     // Cek jika ada parameter verifikasi
-    const startParam = match[1]?.trim();
-    if (startParam && startParam.startsWith('_verify_')) {
-        const groupId = startParam.split('_')[2];
-        const groupInfo = await bot.getChat(groupId);
-        
-        await bot.sendMessage(chatId, 
-            `✅ *Silahkan Verifikasi Agar Dapat Mengirimkan Pesan Ke Dalam Grup ${groupInfo.title}* 😆`, {
-            parse_mode: 'Markdown',
-            reply_markup: {
-                keyboard: [[{
-                    text: '📱 Verifikasi',
-                    request_contact: true
-                }]],
-                resize_keyboard: true,
-                one_time_keyboard: true
-            }
-        });
-        
-        // Simpan data verifikasi sementara
-        const tempVerifyData = loadData('DataUser.json');
-        tempVerifyData[msg.from.id] = {
-            groupId: groupId,
-            timestamp: Date.now()
-        };
-        saveData('DataUser.json', tempVerifyData);
-        
-        return;
+    const startParam = match[1];
+    if (startParam && startParam.startsWith('verify_')) {
+        const groupId = startParam.split('verify_')[1];
+        try {
+            const groupInfo = await bot.getChat(groupId);
+            
+            await bot.sendMessage(chatId, 
+                `✅ Silahkan Verifikasi Agar Dapat Mengirimkan Pesan Ke Dalam Grup ${groupInfo.title} 😆`, {
+                parse_mode: 'Markdown',
+                reply_markup: {
+                    keyboard: [[{
+                        text: '📱 Verifikasi',
+                        request_contact: true
+                    }]],
+                    resize_keyboard: true,
+                    one_time_keyboard: true
+                }
+            });
+            
+            // Simpan data verifikasi sementara
+            const tempVerifyData = loadData('temp_verify.json');
+            tempVerifyData[msg.from.id] = {
+                groupId: groupId,
+                timestamp: Date.now()
+            };
+            saveData('temp_verify.json', tempVerifyData);
+            
+            return;
+        } catch (error) {
+            console.error('Error getting group info:', error);
+            await bot.sendMessage(chatId, '❌ Terjadi kesalahan saat memproses verifikasi. Silahkan coba lagi.');
+            return;
+        }
     }
 
     // Pesan start normal jika bukan verifikasi
-    await bot.sendMessage(chatId, `🙌 halo ${username}\n👀 saya adalah bot proteksi grup ✅\n\n🙏🏻 kirimkan pesan /help untuk bantuan`, {
+    await bot.sendMessage(chatId, 
+        `🙌 halo ${username}\n👀 saya adalah bot proteksi grup ✅\n\n🙏🏻 kirimkan pesan /help untuk bantuan`, {
         parse_mode: 'Markdown',
         reply_markup: {
             inline_keyboard: [[
-                { text: '➕ Invite', url: `https://t.me/proteksigroupbot?startgroup=true` }
+                { text: '➕ Invite', url: `https://t.me/${bot.me.username}?startgroup=true` }
             ]]
         }
     });
+});
+
+// Message handler for group protection
+bot.on('message', async (msg) => {
+    // Skip if not in group/supergroup
+    if (msg.chat.type !== 'group' && msg.chat.type !== 'supergroup') return;
+
+    // Load group data
+    const groupData = loadData('groups.json');
+    
+    // Skip if protection is not enabled
+    if (!groupData[msg.chat.id]?.protection) return;
+
+    // Check if user is verified
+    const userData = loadData(DATA_USER_FILE);
+    if (!userData[msg.from.id]) {
+        try {
+            // Delete message
+            await bot.deleteMessage(msg.chat.id, msg.message_id);
+            
+            // Send notification with verification button
+            const notifMsg = await bot.sendMessage(msg.chat.id,
+                `⚠️ @${msg.from.username || msg.from.first_name} kamu harus terverifikasi terlebih dahulu! 🙏🏻\n\n✅ click button dibawah ini 👀`,
+                {
+                    reply_markup: {
+                        inline_keyboard: [[
+                            { text: '✅ Verifikasi', url: `https://t.me/${bot.me.username}?start=verify_${msg.chat.id}` }
+                        ]]
+                    }
+                }
+            );
+
+            // Delete notification after 3 minutes
+            setTimeout(() => {
+                bot.deleteMessage(msg.chat.id, notifMsg.message_id).catch(() => {});
+            }, 180000);
+        } catch (err) {
+            console.error('Error in protection handler:', err);
+        }
+    }
 });
 
 // Contact message handler untuk verifikasi
@@ -138,7 +191,7 @@ bot.on('contact', async (msg) => {
     const contact = msg.contact;
     
     // Load temporary verification data
-    const tempVerifyData = loadData('DataUser.json');
+    const tempVerifyData = loadData('temp_verify.json');
     
     if (tempVerifyData[msg.from.id]) {
         const verifyData = tempVerifyData[msg.from.id];
@@ -160,9 +213,9 @@ bot.on('contact', async (msg) => {
             
             // Remove temporary verification data
             delete tempVerifyData[msg.from.id];
-            saveData('DataUser.json', tempVerifyData);
+            saveData('temp_verify.json', tempVerifyData);
             
-            // Send success message with cool emojis
+            // Send success message with emojis
             await bot.sendMessage(chatId, 
                 `✅ *Verifikasi Berhasil!*\n\n` +
                 `🌟 Selamat ${contact.first_name}!\n` +
@@ -176,11 +229,15 @@ bot.on('contact', async (msg) => {
             });
             
             // Notify group
-            const groupInfo = await bot.getChat(groupId);
-            await bot.sendMessage(groupId, 
-                `✨ User @${msg.from.username || msg.from.first_name} telah terverifikasi dan dapat mengirim pesan dalam grup!`, {
-                parse_mode: 'Markdown'
-            });
+            try {
+                const groupInfo = await bot.getChat(groupId);
+                await bot.sendMessage(groupId, 
+                    `✨ User @${msg.from.username || msg.from.first_name} telah terverifikasi dan dapat mengirim pesan dalam grup!`, {
+                    parse_mode: 'Markdown'
+                });
+            } catch (err) {
+                console.error('Error sending group notification:', err);
+            }
         } else {
             await bot.sendMessage(chatId, 
                 '❌ Verifikasi gagal! Mohon kirim kontak Anda sendiri.', {
@@ -203,7 +260,6 @@ bot.on('contact', async (msg) => {
         });
     }
 });
-
 // Initialize temp_verify.json if not exists
 if (!fs.existsSync('DataUser.json')) {
     fs.writeFileSync('DataUser.json', JSON.stringify({}));
@@ -413,7 +469,7 @@ bot.on('message', async (msg) => {
         try {
             await bot.deleteMessage(msg.chat.id, msg.message_id);
             const notifMsg = await bot.sendMessage(msg.chat.id,
-                `⚠️ @${msg.from.username || msg.from.first_name}, anda harus terverifikasi terlebih dahulu!`,
+                `⚠️ @${msg.from.username || msg.from.first_name} kamu harus terverifikasi terlebih dahulu! 🙏🏻\n\n✅ click button dibawah ini 👀`,
                 {
                     reply_markup: {
                         inline_keyboard: [[
