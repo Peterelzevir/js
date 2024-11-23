@@ -40,9 +40,6 @@ const getFormattedTime = () => {
     return moment().tz('Asia/Jakarta').format('DD/MM/YYYY HH:mm:ss [WIB]');
 };
 
-const TelegramBot = require('node-telegram-bot-api');
-const bot = new TelegramBot('TOKEN_BOT', { polling: true });
-
 // Inisialisasi bot.me
 bot.getMe().then((me) => {
     bot.me = me;
