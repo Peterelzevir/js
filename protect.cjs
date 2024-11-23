@@ -16,12 +16,6 @@ const ID_FILE = 'id.json';
 const DATA_USER_FILE = 'DataUser.json';
 const GROUPS_ID = 'groups.json';
 
-//info bot
-bot.getMe().then((me) => {
-    bot.me = me; // Simpan informasi bot
-    console.log(`Bot ${me.username} siap digunakan.`);
-});
-
 // Initialize data files if they don't exist
 if (!fs.existsSync(ID_FILE)) {
     fs.writeFileSync(ID_FILE, JSON.stringify({}));
@@ -46,25 +40,37 @@ const getFormattedTime = () => {
     return moment().tz('Asia/Jakarta').format('DD/MM/YYYY HH:mm:ss [WIB]');
 };
 
+const TelegramBot = require('node-telegram-bot-api');
+const bot = new TelegramBot('TOKEN_BOT', { polling: true });
+
+// Inisialisasi bot.me
+bot.getMe().then((me) => {
+    bot.me = me;
+    console.log("Bot info:", bot.me); // Log info bot
+});
+
 bot.on('new_chat_members', async (msg) => {
-    console.log(msg.new_chat_members); // Debugging
+    console.log("Full message object:", JSON.stringify(msg, null, 2)); // Debug semua data
     const chatId = msg.chat.id;
     const newMembers = msg.new_chat_members;
 
-    if (!newMembers) {
-        console.error("Tidak ada anggota baru ditemukan.");
+    if (!Array.isArray(newMembers)) {
+        console.error("new_chat_members bukan array:", newMembers);
         return;
     }
 
     for (const member of newMembers) {
-        if (member && member.id === bot.me.id) {
-            await bot.sendMessage(chatId, `✅ *Terima kasih telah mengundang saya ke grup ini!*\n\n⚠️ *PENTING:* Bot harus dijadikan admin grup untuk dapat berfungsi dengan baik.`, {
-                parse_mode: 'Markdown'
-            });
+        if (member && member.id && bot.me && bot.me.id) {
+            if (member.id === bot.me.id) {
+                await bot.sendMessage(chatId, `✅ *Terima kasih telah mengundang saya ke grup ini!*\n\n⚠️ *PENTING:* Bot harus dijadikan admin grup untuk dapat berfungsi dengan baik.`, {
+                    parse_mode: 'Markdown'
+                });
+            }
+        } else {
+            console.error("Data member atau bot.me tidak valid:", { member, botMe: bot.me });
         }
     }
 });
-// ... (kode sebelumnya tetap sama)
 
 // Start command handler yang diupdate
 bot.onText(/\/start(.+)?/, async (msg, match) => {
