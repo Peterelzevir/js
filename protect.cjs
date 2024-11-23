@@ -58,7 +58,7 @@ bot.on('new_chat_members', async (msg) => {
 
     for (const member of newMembers) {
         if (member && member.id && bot.me && bot.me.id) {
-            if (member.id === bot.me.id) {
+            if (member.id === bot.me) {
                 await bot.sendMessage(chatId, `✅ *Terima kasih telah mengundang saya ke grup ini!*\n\n⚠️ *PENTING:* Bot harus dijadikan admin grup untuk dapat berfungsi dengan baik.`, {
                     parse_mode: 'Markdown'
                 });
