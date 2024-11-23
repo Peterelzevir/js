@@ -16,6 +16,12 @@ const ID_FILE = 'id.json';
 const DATA_USER_FILE = 'DataUser.json';
 const GROUPS_ID = 'groups.json';
 
+//info bot
+bot.getMe().then((me) => {
+    bot.me = me; // Simpan informasi bot
+    console.log(`Bot ${me.username} siap digunakan.`);
+});
+
 // Initialize data files if they don't exist
 if (!fs.existsSync(ID_FILE)) {
     fs.writeFileSync(ID_FILE, JSON.stringify({}));
@@ -40,20 +46,24 @@ const getFormattedTime = () => {
     return moment().tz('Asia/Jakarta').format('DD/MM/YYYY HH:mm:ss [WIB]');
 };
 
-// Bot event handlers
 bot.on('new_chat_members', async (msg) => {
+    console.log(msg.new_chat_members); // Debugging
     const chatId = msg.chat.id;
     const newMembers = msg.new_chat_members;
-    
+
+    if (!newMembers) {
+        console.error("Tidak ada anggota baru ditemukan.");
+        return;
+    }
+
     for (const member of newMembers) {
-        if (member.id === bot.me.id) {
+        if (member && member.id === bot.me.id) {
             await bot.sendMessage(chatId, `✅ *Terima kasih telah mengundang saya ke grup ini!*\n\n⚠️ *PENTING:* Bot harus dijadikan admin grup untuk dapat berfungsi dengan baik.`, {
                 parse_mode: 'Markdown'
             });
         }
     }
 });
-
 // ... (kode sebelumnya tetap sama)
 
 // Start command handler yang diupdate
