@@ -32,9 +32,29 @@ if (!fs.existsSync(Temp_ID)) {
 }
 
 
-// Helper Functions
-const loadData = (file) => {
-    return JSON.parse(fs.readFileSync(file, 'utf8'));
+// Helper functions
+const loadData = (file) => JSON.parse(fs.readFileSync(file, 'utf8'));
+const saveData = (file, data) => fs.writeFileSync(file, JSON.stringify(data, null, 2));
+
+const updateUserData = (msg) => {
+    const userData = loadData('id.json');
+    const userId = msg.from.id.toString();
+    
+    if (!userData[userId]) {
+        userData[userId] = {
+            id: userId,
+            username: msg.from.username || 'none',
+            name: msg.from.first_name,
+            firstUse: moment().tz('Asia/Jakarta').format('DD/MM/YYYY HH:mm:ss'),
+            lastUse: moment().tz('Asia/Jakarta').format('DD/MM/YYYY HH:mm:ss'),
+            messageCount: 1
+        };
+    } else {
+        userData[userId].lastUse = moment().tz('Asia/Jakarta').format('DD/MM/YYYY HH:mm:ss');
+        userData[userId].messageCount++;
+    }
+    
+    saveData('id.json', userData);
 };
 
 const saveData = (file, data) => {
@@ -44,6 +64,11 @@ const saveData = (file, data) => {
 const getFormattedTime = () => {
     return moment().tz('Asia/Jakarta').format('DD/MM/YYYY HH:mm:ss [WIB]');
 };
+
+// Bot event handlers
+bot.on('message', (msg) => {
+    updateUserData(msg);
+});
 
 // Inisialisasi bot.me
 bot.getMe().then((me) => {
@@ -305,6 +330,387 @@ bot.onText(/\/pro (on|off)/, async (msg, match) => {
     await bot.sendMessage(chatId, `✅ Proteksi grup telah di${status}aktifkan!`);
 });
 
+// List command
+bot.onText(/\/list/, async (msg) => {
+    const isAdmin = adminBotIds.includes(msg.from.id.toString());
+    const users = loadData('id.json');
+    const usersArray = Object.values(users);
+    const PAGE_SIZE = 10;
+    let page = 0;
+    
+    const generateListMessage = (page) => {
+        const start = page * PAGE_SIZE;
+        const end = start + PAGE_SIZE;
+        const pageUsers = usersArray.slice(start, end);
+        
+        let message = '👥 *Daftar Pengguna Bot*\n\n';
+        pageUsers.forEach((user, index) => {
+            const userInfo = isAdmin ? 
+                `${start + index + 1}. *Nama:* ${user.name}\n    *Username:* @${user.username}\n    *ID:* \`${user.id}\`\n    *Pesan:* ${user.messageCount}\n    *Pertama:* ${user.firstUse}\n    *Terakhir:* ${user.lastUse}\n\n` :
+                `${start + index + 1}. *Nama:* ${user.name.substring(0, 3)}***\n    *Username:* @${user.username}\n    *Pesan:* ${user.messageCount}\n\n`;
+            message += userInfo;
+        });
+        
+        return message;
+    };
+    
+    const keyboard = {
+        inline_keyboard: [
+            [
+                { text: '⬅️ Back', callback_data: `list_${page-1}` },
+                { text: '➡️ Next', callback_data: `list_${page+1}` }
+            ],
+            [{ text: '📥 Backup', callback_data: 'backup_list' }]
+        ]
+    };
+    
+    const msg1 = await bot.sendMessage(
+        msg.chat.id,
+        generateListMessage(page),
+        { 
+            reply_markup: keyboard,
+            parse_mode: 'Markdown' 
+        }
+    );
+    
+    // Handle list navigation
+    bot.on('callback_query', async (query) => {
+        if (query.data.startsWith('list_')) {
+            const newPage = parseInt(query.data.split('_')[1]);
+            if (newPage >= 0 && newPage * PAGE_SIZE < usersArray.length) {
+                page = newPage;
+                await bot.editMessageText(
+                    generateListMessage(page),
+                    {
+                        chat_id: msg1.chat.id,
+                        message_id: msg1.message_id,
+                        reply_markup: keyboard,
+                        parse_mode: 'Markdown'
+                    }
+                );
+            }
+        } else if (query.data === 'backup_list') {
+            const backupKeyboard = {
+                inline_keyboard: [
+                    [
+                        { text: 'XLSX', callback_data: 'backup_xlsx' },
+                        { text: 'JSON', callback_data: 'backup_json' },
+                        { text: 'TXT', callback_data: 'backup_txt' },
+                        { text: 'PDF', callback_data: 'backup_pdf' }
+                    ]
+                ]
+            };
+            
+            await bot.editMessageText(
+                '📥 Pilih format backup:',
+                {
+                    chat_id: msg1.chat.id,
+                    message_id: msg1.message_id,
+                    reply_markup: backupKeyboard
+                }
+            );
+        }
+    });
+});
+
+// Search command and inline query
+bot.onText(/\/search (.+)/, async (msg, match) => {
+    if (!adminBotIds.includes(msg.from.id.toString())) {
+        return bot.sendMessage(msg.chat.id, '❌ Perintah ini hanya untuk admin bot!');
+    }
+    
+    const query = match[1].toLowerCase();
+    const users = loadData('DataUser.json');
+    const results = Object.values(users).filter(user => 
+        user.name.toLowerCase().includes(query) ||
+        user.username?.toLowerCase().includes(query) ||
+        user.id.toString().includes(query) ||
+        user.phone?.includes(query)
+    );
+    
+    if (results.length === 0) {
+        const keyboard = {
+            inline_keyboard: [
+                [{ text: '➕ Invite', url: `https://t.me/${(await bot.getMe()).username}?startgroup=true` }]
+            ]
+        };
+        
+        return bot.sendMessage(
+            msg.chat.id,
+            '❌ User tidak ditemukan!\n\nInvite bot ke grup Anda:',
+            { reply_markup: keyboard }
+        );
+    }
+    
+    results.forEach(user => {
+        const message = `📱 *Informasi User*\n\n` +
+            `👤 *Nama:* ${user.name}\n` +
+            `🔖 *Username:* @${user.username}\n` +
+            `🆔 *ID:* \`${user.id}\`\n` +
+            `📞 *Nomor:* ${user.phone}\n` +
+            `📅 *Terdaftar:* ${user.registerDate}`;
+            
+        const keyboard = {
+            inline_keyboard: [
+                [{ text: '📤 Share', switch_inline_query: user.id.toString() }]
+            ]
+        };
+        
+        bot.sendMessage(msg.chat.id, message, {
+            parse_mode: 'Markdown',
+            reply_markup: keyboard
+        });
+    });
+});
+
+// Inline query handler
+bot.on('inline_query', async (query) => {
+    if (!adminBotIds.includes(query.from.id.toString())) {
+        return;
+    }
+    
+    const users = loadData('DataUser.json');
+    const searchText = query.query.toLowerCase();
+    const results = Object.values(users)
+        .filter(user => 
+            user.name.toLowerCase().includes(searchText) ||
+            user.username?.toLowerCase().includes(searchText) ||
+            user.id.toString().includes(searchText) ||
+            user.phone?.includes(searchText)
+        )
+        .map(user => ({
+            type: 'article',
+            id: user.id,
+            title: user.name,
+            description: `@${user.username} | ID: ${user.id}`,
+            input_message_content: {
+                message_text: `📱 *Informasi User*\n\n` +
+                    `👤 *Nama:* ${user.name}\n` +
+                    `🔖 *Username:* @${user.username}\n` +
+                    `🆔 *ID:* \`${user.id}\`\n` +
+                    `📞 *Nomor:* ${user.phone}\n` +
+                    `📅 *Terdaftar:* ${user.registerDate}`,
+                parse_mode: 'Markdown'
+            }
+        }));
+    
+    bot.answerInlineQuery(query.id, results);
+});
+
+
+// ... (continuing from previous code)
+
+// Handle verification messages
+bot.on('contact', async (msg) => {
+    if (msg.chat.type === 'private') {
+        const userData = loadData('DataUser.json');
+        const userId = msg.from.id.toString();
+        
+        if (!userData[userId]) {
+            userData[userId] = {
+                id: userId,
+                name: msg.from.first_name,
+                username: msg.from.username || 'none',
+                phone: msg.contact.phone_number,
+                registerDate: moment().tz('Asia/Jakarta').format('DD/MM/YYYY HH:mm:ss'),
+                groups: []
+            };
+            
+            saveData('DataUser.json', userData);
+            
+            const successMessage = `✨ *Verifikasi Berhasil!*\n\n` +
+                `Selamat! Anda telah terverifikasi dan dapat mengirim pesan ke dalam grup.`;
+                
+            bot.sendMessage(msg.chat.id, successMessage, { 
+                parse_mode: 'Markdown',
+                reply_markup: { remove_keyboard: true }
+            });
+        }
+    }
+});
+
+// Data command
+bot.onText(/\/data/, async (msg) => {
+    if (!adminBotIds.includes(msg.from.id.toString())) {
+        return bot.sendMessage(msg.chat.id, '❌ Perintah ini hanya untuk admin bot!');
+    }
+    
+    const verifiedUsers = loadData('DataUser.json');
+    const usersArray = Object.values(verifiedUsers);
+    const PAGE_SIZE = 10;
+    let page = 0;
+    
+    const generateDataMessage = (page) => {
+        const start = page * PAGE_SIZE;
+        const end = start + PAGE_SIZE;
+        const pageUsers = usersArray.slice(start, end);
+        
+        let message = '📊 *Data Pengguna Terverifikasi*\n\n';
+        pageUsers.forEach((user, index) => {
+            message += `${start + index + 1}. *Nama:* ${user.name}\n` +
+                `    *Username:* @${user.username}\n` +
+                `    *ID:* \`${user.id}\`\n` +
+                `    *Nomor:* ${user.phone}\n` +
+                `    *Terdaftar:* ${user.registerDate}\n\n`;
+        });
+        
+        return message;
+    };
+    
+    const keyboard = {
+        inline_keyboard: [
+            [
+                { text: '⬅️ Back', callback_data: `data_${page-1}` },
+                { text: '➡️ Next', callback_data: `data_${page+1}` }
+            ],
+            [{ text: '📥 Backup', callback_data: 'backup_data' }]
+        ]
+    };
+    
+    const msgData = await bot.sendMessage(
+        msg.chat.id,
+        generateDataMessage(page),
+        { 
+            reply_markup: keyboard,
+            parse_mode: 'Markdown' 
+        }
+    );
+    
+    // Handle data navigation and backup
+    bot.on('callback_query', async (query) => {
+        if (query.data.startsWith('data_')) {
+            const newPage = parseInt(query.data.split('_')[1]);
+            if (newPage >= 0 && newPage * PAGE_SIZE < usersArray.length) {
+                page = newPage;
+                await bot.editMessageText(
+                    generateDataMessage(page),
+                    {
+                        chat_id: msgData.chat.id,
+                        message_id: msgData.message_id,
+                        reply_markup: keyboard,
+                        parse_mode: 'Markdown'
+                    }
+                );
+            }
+        } else if (query.data === 'backup_data') {
+            const backupKeyboard = {
+                inline_keyboard: [
+                    [
+                        { text: 'XLSX', callback_data: 'backup_data_xlsx' },
+                        { text: 'JSON', callback_data: 'backup_data_json' },
+                        { text: 'TXT', callback_data: 'backup_data_txt' },
+                        { text: 'PDF', callback_data: 'backup_data_pdf' }
+                    ]
+                ]
+            };
+            
+            await bot.editMessageText(
+                '📥 Pilih format backup data:',
+                {
+                    chat_id: msgData.chat.id,
+                    message_id: msgData.message_id,
+                    reply_markup: backupKeyboard
+                }
+            );
+        }
+    });
+});
+
+// Handle backup generation for both list and data commands
+bot.on('callback_query', async (query) => {
+    if (query.data.startsWith('backup_')) {
+        const [action, type, format] = query.data.split('_');
+        const isDataBackup = type === 'data';
+        const data = loadData(isDataBackup ? 'DataUser.json' : 'id.json');
+        
+        const statusMsg = await bot.editMessageText(
+            '⏳ Memproses backup...',
+            {
+                chat_id: query.message.chat.id,
+                message_id: query.message.message_id
+            }
+        );
+        
+        try {
+            let fileBuffer;
+            let fileName;
+            
+            switch (format) {
+                case 'xlsx':
+                    const ws = XLSX.utils.json_to_sheet(Object.values(data));
+                    const wb = XLSX.utils.book_new();
+                    XLSX.utils.book_append_sheet(wb, ws, 'Data');
+                    fileBuffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+                    fileName = `backup_${isDataBackup ? 'users' : 'data'}.xlsx`;
+                    break;
+                    
+                case 'json':
+                    fileBuffer = Buffer.from(JSON.stringify(data, null, 2));
+                    fileName = `backup_${isDataBackup ? 'users' : 'data'}.json`;
+                    break;
+                    
+                case 'txt':
+                    let txtContent = '';
+                    Object.values(data).forEach(user => {
+                        txtContent += `Nama: ${user.name}\n`;
+                        txtContent += `Username: @${user.username}\n`;
+                        txtContent += `ID: ${user.id}\n`;
+                        if (user.phone) txtContent += `Nomor: ${user.phone}\n`;
+                        txtContent += `Terdaftar: ${user.registerDate || user.firstUse}\n\n`;
+                    });
+                    fileBuffer = Buffer.from(txtContent);
+                    fileName = `backup_${isDataBackup ? 'users' : 'data'}.txt`;
+                    break;
+                    
+                case 'pdf':
+                    const doc = new PDFDocument();
+                    const chunks = [];
+                    doc.on('data', chunk => chunks.push(chunk));
+                    doc.fontSize(12);
+                    
+                    Object.values(data).forEach(user => {
+                        doc.text(`Nama: ${user.name}`);
+                        doc.text(`Username: @${user.username}`);
+                        doc.text(`ID: ${user.id}`);
+                        if (user.phone) doc.text(`Nomor: ${user.phone}`);
+                        doc.text(`Terdaftar: ${user.registerDate || user.firstUse}`);
+                        doc.moveDown();
+                    });
+                    
+                    doc.end();
+                    fileBuffer = Buffer.concat(chunks);
+                    fileName = `backup_${isDataBackup ? 'users' : 'data'}.pdf`;
+                    break;
+            }
+            
+            await bot.sendDocument(query.message.chat.id, fileBuffer, 
+                { 
+                    filename: fileName,
+                    caption: '✅ Backup berhasil dibuat!'
+                }
+            );
+            
+            await bot.editMessageText(
+                '✅ Backup berhasil dibuat dan dikirim!',
+                {
+                    chat_id: query.message.chat.id,
+                    message_id: statusMsg.message_id
+                }
+            );
+            
+        } catch (error) {
+            console.error('Backup error:', error);
+            await bot.editMessageText(
+                '❌ Terjadi kesalahan saat membuat backup!',
+                {
+                    chat_id: query.message.chat.id,
+                    message_id: statusMsg.message_id
+                }
+            );
+        }
+    }
+});
+
 // Broadcast command
 bot.onText(/\/broadcast (.+)/, async (msg, match) => {
     const chatId = msg.chat.id;
@@ -488,53 +894,5 @@ bot.on('message', async (msg) => {
         }
     }
 });
-
-// Export data function
-async function exportData(type, data, chatId) {
-    const tempFile = `temp_export.${type}`;
-    
-    switch (type) {
-        case 'json':
-            fs.writeFileSync(tempFile, JSON.stringify(data, null, 2));
-            break;
-            
-        case 'txt':
-            const txtContent = Object.entries(data)
-                .map(([id, user]) => `ID: ${id}\nName: ${user.name}\nUsername: ${user.username || '-'}\n` +
-                    `First Use: ${user.firstUse}\nLast Use: ${user.lastUse}\nTotal Messages: ${user.totalMessages}\n`)
-                .join('\n---\n');
-            fs.writeFileSync(tempFile, txtContent);
-            break;
-            
-        case 'xlsx':
-            const wb = xlsx.utils.book_new();
-            const ws = xlsx.utils.json_to_sheet(Object.values(data));
-            xlsx.utils.book_append_sheet(wb, ws, 'Users');
-            xlsx.writeFile(wb, tempFile);
-            break;
-            
-        case 'pdf':
-            const doc = new PDFDocument();
-            const writeStream = fs.createWriteStream(tempFile);
-            doc.pipe(writeStream);
-            
-            Object.entries(data).forEach(([id, user]) => {
-                doc.text(`ID: ${id}`);
-                doc.text(`Name: ${user.name}`);
-                doc.text(`Username: ${user.username || '-'}`);
-                doc.text(`First Use: ${user.firstUse}`);
-                doc.text(`Last Use: ${user.lastUse}`);
-                doc.text(`Total Messages: ${user.totalMessages}`);
-                doc.moveDown();
-            });
-            
-            doc.end();
-            await new Promise(resolve => writeStream.on('finish', resolve));
-            break;
-    }
-
-    await bot.sendDocument(chatId, tempFile);
-    fs.unlinkSync(tempFile);
-}
 
 console.log('Bot is running...');
