@@ -47,7 +47,7 @@ bot.on('new_chat_members', async (msg) => {
     
     for (const member of newMembers) {
         if (member.id === bot.me.id) {
-            await bot.sendMessage(chatId, `*Terima kasih telah mengundang saya ke grup ini!*\n\n⚠️ *PENTING:* Bot harus dijadikan admin grup untuk dapat berfungsi dengan baik.`, {
+            await bot.sendMessage(chatId, `✅ *Terima kasih telah mengundang saya ke grup ini!*\n\n⚠️ *PENTING:* Bot harus dijadikan admin grup untuk dapat berfungsi dengan baik.`, {
                 parse_mode: 'Markdown'
             });
         }
@@ -98,7 +98,7 @@ bot.onText(/\/start(.+)?/, async (msg, match) => {
         });
         
         // Simpan data verifikasi sementara
-        const tempVerifyData = loadData('temp_verify.json');
+        const tempVerifyData = loadData('DataUser.json');
         tempVerifyData[msg.from.id] = {
             groupId: groupId,
             timestamp: Date.now()
@@ -113,7 +113,7 @@ bot.onText(/\/start(.+)?/, async (msg, match) => {
         parse_mode: 'Markdown',
         reply_markup: {
             inline_keyboard: [[
-                { text: '➕ Invite', url: `https://t.me/${bot.me.username}?startgroup=true` }
+                { text: '➕ Invite', url: `https://t.me/proteksigroupbot?startgroup=true` }
             ]]
         }
     });
