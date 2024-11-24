@@ -18,7 +18,7 @@ bot.on('inline_query', (query) => {
             results.push({
                 type: 'article',
                 id: query.id,
-                title: '✅ Execute Command',
+                title: '🌐 Execute Command',
                 input_message_content: {
                     message_text: formattedResponse,
                     parse_mode: 'MarkdownV2',
