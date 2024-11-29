@@ -5,11 +5,15 @@ const fs = require('fs');
 const bot = new Telegraf('7354627036:AAHP9XY9TkwsExno1gqOZTTYT8d_zpVgdJY');
 const adminId = '5988451717'; // ID Admin
 
-// Data Pengguna
-let data = JSON.parse(fs.readFileSync('data.json', 'utf8'));
-if (!data.users) data.users = {};
-if (!data.banned) data.banned = [];
+let data;
 
+try {
+    const rawData = fs.readFileSync('data.json', 'utf8');
+    data = rawData ? JSON.parse(rawData) : { users: {}, banned: [] }; // Default structure if empty
+} catch (error) {
+    console.error("Error reading or parsing data.json:", error);
+    data = { users: {}, banned: [] }; // Initialize with default structure on error
+}
 // Fungsi Simpan Data
 function saveData() {
     fs.writeFileSync('data.json', JSON.stringify(data, null, 2));
