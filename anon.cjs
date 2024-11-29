@@ -2,7 +2,7 @@ const { Telegraf, Markup } = require('telegraf');
 const fs = require('fs');
 
 // Konfigurasi Bot
-const bot = new Telegraf('7354627036:AAHP9XY9TkwsExno1gqOZTTYT8d_zpVgdJY');
+const bot = new Telegraf('7354627036:AAFXG281EqpBwFkx7HIZ-y32e-DmfrshqxM');
 const adminId = '5988451717'; // ID Admin
 
 let data;
