@@ -2,7 +2,7 @@ const TelegramBot = require('node-telegram-bot-api');
 const fs = require('fs');
 
 // Token from BotFather
-const token = '7354627036:AAFpTYvBkyRpFRqLPDaU4UT-Wy5y9LZwoe4';
+const token = '7354627036:AAFXG281EqpBwFkx7HIZ-y32e-DmfrshqxM';
 const bot = new TelegramBot(token, { polling: true });
 const adminId = '5988451717'; // Admin ID
 
@@ -23,7 +23,7 @@ function saveData() {
 }
 
 // Middleware to check banned users
-bot.on('message', (msg, match) => {
+bot.on('message', (msg) => {
     if (data.banned.includes(msg.from.id)) {
         bot.sendMessage(msg.chat.id, '❌ Anda telah di-*banned* oleh admin\n\n👀 chat admin now!');
         return;
@@ -39,8 +39,8 @@ bot.on('message', (msg, match) => {
 
         bot.sendMessage(
             msg.chat.id,
-            `👋 *selamat datang di Anonymous Chat! ✅*\n\n` +
-            `gunakan perintah berikut untuk memulai:\n` +
+            `👋 *Selamat datang di Anonymous Chat! ✅*\n\n` +
+            `Gunakan perintah berikut untuk memulai:\n` +
             `👉 \`/next\` - Cari pasangan lain 👀\n` +
             `👉 \`/stop\` - Akhiri chat 🙏🏻\n` +
             `👉 \`/setgender\` - Atur gender 😎\n` +
@@ -218,8 +218,4 @@ bot.onText(/\/broadcast/, async (msg) => {
         `✅ *Broadcast selesai!*\n📤 Berhasil: ${sent}\n❌ Gagal: ${failed}`,
         { parse_mode: 'Markdown' }
     );
-});
-
-bot.on("polling_error", (error) => {
-    console.error("Polling error:", error);
 });
