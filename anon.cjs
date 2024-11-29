@@ -219,3 +219,7 @@ bot.onText(/\/broadcast/, async (msg) => {
         { parse_mode: 'Markdown' }
     );
 });
+
+bot.on("polling_error", (error) => {
+    console.error("Polling error:", error);
+});
