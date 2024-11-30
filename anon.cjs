@@ -431,26 +431,26 @@ bot.on('callback_query', async (callbackQuery) => {
     }
 });
 
-// Fungsi untuk mencari pasangan
 async function findPartner(userId) {
     const user = data.users[userId];
+    const searchingUsers = searchingQueue.filter(queuedUserId => {
+        const queuedUser = data.users[queuedUserId];
+        // Prioritaskan pencarian berdasarkan urutan antrian
+        // Utamakan beda gender
+        return queuedUserId !== userId && 
+               queuedUser.gender !== user.gender &&
+               !queuedUser.partner;
+    });
 
-    if (!user || !user.gender) return null;
-
-    for (const partnerId of searchingQueue) {
-        const partner = data.users[partnerId];
-
-        if (
-            partnerId !== userId && 
-            partner.gender && 
-            !partner.partner && 
-            partner.gender !== user.gender
-        ) {
-            return partnerId;
-        }
+    // Jika tidak ada pasangan beda gender, cari pasangan apa pun
+    if (searchingUsers.length === 0) {
+        return searchingQueue.find(queuedUserId => 
+            queuedUserId !== userId && !data.users[queuedUserId].partner
+        );
     }
 
-    return null; // Tidak ada pasangan yang cocok
+    // Kembalikan pasangan pertama yang sesuai kriteria
+    return searchingUsers[0];
 }
 
 // Fungsi untuk menghapus pengguna dari antrean
