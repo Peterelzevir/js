@@ -407,6 +407,7 @@ case callbackData.startsWith('report_'): {
 
 const searchingQueue = []; // Queue untuk menyimpan ID pengguna yang sedang mencari
 
+// Handler for /next command
 bot.onText(/\/next/, async (msg) => {
     const userId = msg.from.id.toString();
     const user = data.users[userId];
@@ -421,14 +422,17 @@ bot.onText(/\/next/, async (msg) => {
         return;
     }
 
+    // Cek apakah sudah dalam antrean pencarian
     if (searchingQueue.includes(userId)) {
         bot.sendMessage(msg.chat.id, '⚠️ Anda sudah dalam antrean pencarian, mohon tunggu 👀');
         return;
     }
 
+    // Tambahkan ke antrean pencarian
     searchingQueue.push(userId);
 
-    const searchMsg = await bot.sendMessage(msg.chat.id, '🔍 _Mencari pasangan..._', {
+    // Tambahkan inline keyboard untuk berhenti mencari
+    const searchMsg = await bot.sendMessage(msg.chat.id, '🔍 _Mencari pasangan..._', { 
         parse_mode: 'Markdown',
         reply_markup: {
             inline_keyboard: [
@@ -437,52 +441,7 @@ bot.onText(/\/next/, async (msg) => {
         }
     });
 
-    try {
-        const partnerId = await findPartner(userId);
-
-        if (partnerId) {
-            await bot.deleteMessage(msg.chat.id, searchMsg.message_id);
-            bot.sendMessage(msg.chat.id, '✨ *Pasangan ditemukan! Mulailah mengobrol\n\n👀 /stop untuk akhiri chat*', { parse_mode: 'Markdown' });
-            bot.sendMessage(partnerId, '✨ *Pasangan ditemukan! Mulailah mengobrol\n\n👀 /stop untuk akhiri chat*', { parse_mode: 'Markdown' });
-
-            data.users[userId].partner = partnerId;
-            data.users[partnerId].partner = userId;
-
-            removeFromQueue(userId);
-            removeFromQueue(partnerId);
-
-            saveData();
-        } else {
-            setTimeout(async () => {
-                const stillSearching = searchingQueue.includes(userId);
-
-                if (stillSearching && !data.users[userId].partner) {
-                    await bot.deleteMessage(msg.chat.id, searchMsg.message_id);
-                    bot.sendMessage(msg.chat.id, '❌ Tidak ada pasangan yang tersedia, Pencarian dihentikan 😔\n\n💬 /next untuk mencari kembali ✅');
-                    removeFromQueue(userId);
-                }
-            }, 5 * 60 * 1000);
-        }
-    } catch (error) {
-        console.error('Error mencari pasangan:', error);
-        bot.sendMessage(msg.chat.id, '❌ Terjadi kesalahan saat mencari pasangan, silakan coba lagi.');
-        removeFromQueue(userId);
-    }
-});
-
-
-// Handler untuk callback tombol berhenti mencari
-bot.on('callback_query', async (callbackQuery) => {
-    const userId = callbackQuery.from.id.toString();
-    
-    if (callbackQuery.data === 'stop_searching') {
-        removeFromQueue(userId);
-        await bot.answerCallbackQuery(callbackQuery.id, '✅ Pencarian dihentikan');
-        await bot.deleteMessage(callbackQuery.message.chat.id, callbackQuery.message.message_id);
-        await bot.sendMessage(callbackQuery.message.chat.id, '❌ Pencarian dihentikan');
-    }
-});
-
+    // Menemukan pasangan (pastikan fungsi findPartner berada dalam async)
     const partnerId = await findPartner(userId);
 
     if (partnerId) {
@@ -513,12 +472,23 @@ bot.on('callback_query', async (callbackQuery) => {
     }
 });
 
+// Handler untuk callback tombol berhenti mencari
+bot.on('callback_query', async (callbackQuery) => {
+    const userId = callbackQuery.from.id.toString();
+    
+    if (callbackQuery.data === 'stop_searching') {
+        removeFromQueue(userId);
+        await bot.answerCallbackQuery(callbackQuery.id, '✅ Pencarian dihentikan');
+        await bot.deleteMessage(callbackQuery.message.chat.id, callbackQuery.message.message_id);
+        await bot.sendMessage(callbackQuery.message.chat.id, '❌ Pencarian dihentikan');
+    }
+});
+
+// Fungsi untuk mencari pasangan
 async function findPartner(userId) {
     const user = data.users[userId];
     const searchingUsers = searchingQueue.filter(queuedUserId => {
         const queuedUser = data.users[queuedUserId];
-        // Prioritaskan pencarian berdasarkan urutan antrian
-        // Utamakan beda gender
         return queuedUserId !== userId && 
                queuedUser.gender !== user.gender &&
                !queuedUser.partner;
