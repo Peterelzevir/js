@@ -92,8 +92,8 @@ bot.on('message', async (msg) => {
     if (msg.text === '/start') {
         bot.sendMessage(
             msg.chat.id,
-            `👋 *Selamat datang di Anonymous Chat! ✅*\n\n` +
-            `Gunakan perintah berikut untuk memulai:\n` +
+            `👋 *Selamat datang di Anonymous Chat @anontelerobot! ✅*\n\n` +
+            `👀 Gunakan perintah berikut untuk memulai:\n` +
             `👉 \`/next\` - Cari pasangan lain 👀\n` +
             `👉 \`/stop\` - Akhiri chat 🙏🏻\n` +
             `👉 \`/setgender\` - Atur gender 😎\n` +
@@ -204,7 +204,7 @@ bot.on('callback_query', async (callbackQuery) => {
 
             saveData(); // Pastikan fungsi saveData() berfungsi
 
-            bot.editMessageText(`✅ Gender Anda telah diatur ke *${gender}*.`, {
+            bot.editMessageText(`✅ Gender Anda telah diatur ke *${gender}*\n\n👀 sekarang mulailah chatting!`, {
                 parse_mode: 'Markdown',
                 chat_id: message.chat.id,
                 message_id: message.message_id
@@ -237,17 +237,17 @@ bot.on('callback_query', async (callbackQuery) => {
         // Quick Help
         case callbackData === 'quick_help': {
             const quickHelp = `
-*🚀 Panduan Singkat Anonymous Chat*
+*✳️ Panduan Singkat Anonymous Chat @anontelerobot*
 
-1️⃣ Atur gender dengan \`/setgender\`
-2️⃣ Temukan pasangan dengan \`/next\`
-3️⃣ Mulai mengobrol!
-4️⃣ Gunakan \`/stop\` untuk mengakhiri
+1️⃣ Atur gender dengan \`/setgender\` 🔔
+2️⃣ Temukan pasangan dengan \`/next\` 👁‍🗨
+3️⃣ Mulai mengobrol! 💬
+4️⃣ Gunakan \`/stop\` untuk mengakhiri 🛑
 
-*Tips:*
-• Selalu bersikap sopan
-• Chat bersifat anonim
-• Nikmatilah pengalaman chatting!
+*👁‍🗨 Tips :*
+• Selalu bersikap sopan ❤
+• Chat bersifat anonim ✅
+• Nikmatilah pengalaman chatting! 🤩
 `;
             bot.editMessageText(quickHelp, {
                 parse_mode: 'Markdown',
@@ -260,30 +260,30 @@ bot.on('callback_query', async (callbackQuery) => {
         // Full Rules
         case callbackData === 'full_rules': {
             const fullRules = `
-*⚖️ Peraturan Lengkap Anonymous Chat*
+*⚖️ Peraturan Lengkap Anonymous Chat @anontelerobot*
 
-🔹 *Ketentuan Umum:*
-• Wajib mengatur gender sebelum chat
-• Satu kali pengaturan gender
-• Dilarang mengirim konten pornografi
-• Dilarang melakukan pemerasan/scamming
-• Hormati privasi pasangan chat
+🔹 *👀 Ketentuan Umum:*
+• Wajib mengatur gender sebelum chat ❕
+• Satu kali pengaturan gender✅
+• Dilarang mengirim konten pornografi 🔞
+• Dilarang melakukan pemerasan/scamming 🚫
+• Hormati privasi pasangan chat 🙏🏻
 
-🔹 *Konsekuensi Pelanggaran:*
-• Pelanggaran ringan: Peringatan
-• Pelanggaran berat: Banned permanen
-• Admin berhak memblokir tanpa pemberitahuan
+🔹 *❗Konsekuensi Pelanggaran:*
+• Pelanggaran ringan: Peringatan ✅
+• Pelanggaran berat: Banned permanen ✅
+• Admin berhak memblokir tanpa pemberitahuan ‼️
 
-🔹 *Etika Chatting:*
-• Gunakan bahasa santun
-• Tidak boleh meminta data pribadi
-• Tidak boleh menghina/melecehkan
-• Fokus pada percakapan yang sehat
+🔹 *🚫 Etika Chatting:*
+• Gunakan bahasa santun ❤
+• Tidak boleh meminta data pribadi ❌
+• Tidak boleh menghina/melecehkan 🔞
+• Fokus pada percakapan yang sehat 💯
 
-🔹 *Privasi:*
-• Hanya gender yang terlihat
-• Identitas asli tidak pernah dibagikan
-• Percakapan bersifat sementara
+🔹 *👁‍🗨 Privasi:*
+• Hanya gender yang terlihat ✅
+• Identitas asli tidak pernah dibagikan ✅
+• Percakapan bersifat sementara ✅
 `;
             bot.editMessageText(fullRules, {
                 parse_mode: 'Markdown',
@@ -446,41 +446,41 @@ bot.onText(/\/help/, (msg) => {
     const helpMessage = `
 *🤖 Anonymous Chat Bot - Panduan Lengkap* 
 
-*👤 Pengaturan Akun:*
-• \`/start\` - Memulai bot dan melihat petunjuk dasar
-• \`/setgender\` - Atur gender Anda (hanya sekali)
+*👤 Pengaturan Akun :*
+• \`/start\` - Memulai bot dan melihat petunjuk dasar ✅
+• \`/setgender\` - Atur gender Anda (hanya sekali) ‼️
 
-*💬 Fitur Chat:*
-• \`/next\` - Temukan pasangan chat acak dengan gender berbeda
-• \`/stop\` - Akhiri percakapan saat ini
-   - Akan menawarkan opsi pelaporan setelah mengakhiri chat
+*💬 Fitur Chat :*
+• \`/next\` - Temukan pasangan chat acak dengan gender berbeda ✅
+• \`/stop\` - Akhiri percakapan saat ini ‼️
+   - Akan menawarkan opsi pelaporan setelah mengakhiri chat 💬
 
-*🚨 Pelaporan:*
+*🚨 Pelaporan :*
 • Saat menggunakan \`/stop\`, Anda dapat melaporkan pasangan dengan berbagai alasan:
-   - Kekerasan
-   - Pornografi
-   - Pemerasan
-   - Scamming
-   - Alasan Lainnya
+   - Kekerasan ⚠️
+   - Pornografi 🔞
+   - Pemerasan 💰
+   - Scamming ❌
+   - Alasan Lainnya 💬
 
-*ℹ️ Informasi:*
-• \`/totaluser\` - Lihat statistik total pengguna
-• Fitur rahasia: Chat Anda dijamin anonim!
+*ℹ️ Informasi :*
+• \`/totaluser\` - Lihat statistik total pengguna [ admin only ] ✅
+• 👀 Fitur rahasia : Chat Anda dijamin anonim! 🤩
 
-*⚠️ Peraturan Penting:*
-1. Hormati pasangan chat Anda
-2. Dilarang mengirim konten tidak pantas
-3. Satu kali pengaturan gender
-4. Admin dapat memblokir pengguna yang melanggar
+*⚠️ Peraturan Penting :*
+1. Hormati pasangan chat Anda ❕
+2. Dilarang mengirim konten tidak pantas 🔞
+3. Satu kali pengaturan gender ✅
+4. Admin dapat memblokir pengguna yang melanggar ‼️
 
-*🔒 Privasi:*
-• Tidak ada identitas pribadi yang tersimpan
-• Chat dijamin anonim
-• Hanya gender yang diketahui
+*🔒 Privasi :*
+• Tidak ada identitas pribadi yang tersimpan ✅
+• Chat dijamin anonim 👁‍🗨
+• Hanya gender yang diketahui✅
 
-*🆘 Bantuan Tambahan:*
-• Jika mengalami masalah, hubungi admin
-• Pelanggaran dapat berakibat banned
+*🆘 Bantuan Tambahan :*
+• 👀 Jika mengalami masalah, hubungi admin 🤩
+• 🚫 Pelanggaran dapat berakibat banned ✅
 `;
 
     bot.sendMessage(msg.chat.id, helpMessage, { 
