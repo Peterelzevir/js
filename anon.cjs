@@ -223,163 +223,166 @@ bot.onText(/\/setgender/, (msg) => {
     );
 });
 
+// Updated Callback Query Handler
 bot.on('callback_query', async (callbackQuery) => {
     const { data: callbackData, message, from } = callbackQuery;
     const userId = from.id.toString();
 
-    // Pastikan data.users ada
+    // Ensure data.users exists
     if (!data.users) data.users = {};
-    if (!data.users[userId]) data.users[userId] = {}; // Buat objek baru jika belum ada
+    if (!data.users[userId]) data.users[userId] = {}; // Create new object if not exists
 
-    switch (true) {
-        // Gender Selection
-        case callbackData === 'gender_male' || callbackData === 'gender_female': {
-            const gender = callbackData === 'gender_male' ? 'Pria' : 'Wanita';
-            data.users[userId].gender = gender;
-
-            saveData(); // Pastikan fungsi saveData() berfungsi
-
-            bot.editMessageText(`✅ Gender Anda telah diatur ke *${gender}*\n\n👀 sekarang mulailah chatting!`, {
-                parse_mode: 'Markdown',
-                chat_id: message.chat.id,
-                message_id: message.message_id
-            });
-            break;
-        }
-
-        // Report Handling
-case callbackData.startsWith('report_'): {
-    const [, reportedId, reason] = callbackData.split('_');
-    const reporterId = callbackQuery.from.id.toString();
-
-    // Validasi alasan dan ID pelapor
-    if (!reason || !reportedId) {
-        bot.answerCallbackQuery(callbackQuery.id, { text: '❌ Laporan tidak valid' });
-        return;
-    }
-
-    // Cek apakah pengguna sudah pernah melaporkan pengguna ini
-    if (data.reports && data.reports[reporterId] && data.reports[reporterId].includes(reportedId)) {
-        bot.answerCallbackQuery(callbackQuery.id, { text: '⚠️ Anda sudah pernah melaporkan pengguna ini' });
-        return;
-    }
-
-    // Tambahkan logika untuk laporan custom
-    if (reason === 'custom') {
-        // Set state untuk laporan custom
-        userReportState[reporterId] = {
-            reportedUserId: reportedId,
-            awaitingCustomReport: true
-        };
-
-        // Kirim pesan meminta detail laporan
-        await bot.sendMessage(
-            callbackQuery.message.chat.id, 
-            '📝 Silakan tulis alasan laporan secara detail:'
-        );
-
-        // Hapus pesan inline keyboard
-        await bot.deleteMessage(
-            callbackQuery.message.chat.id, 
-            callbackQuery.message.message_id
-        );
-
-        await bot.answerCallbackQuery(callbackQuery.id);
-        return;
-    }
-
-    // Proses laporan standar
     try {
-        // Simpan laporan
-        if (!data.reports) data.reports = {};
-        if (!data.reports[reporterId]) {
-            data.reports[reporterId] = [];
-        }
-        data.reports[reporterId].push(reportedId);
+        switch (true) {
+            // Gender Selection
+            case callbackData === 'gender_male' || callbackData === 'gender_female': {
+                const gender = callbackData === 'gender_male' ? 'Pria' : 'Wanita';
+                data.users[userId].gender = gender;
 
-        // Kirim laporan ke admin
-        const reportMessage = await bot.sendMessage(
-            adminId,
-            `📣 *Laporan Pengguna Baru*\n\n` +
-            `👤 Pelapor: \`${reporterId}\`\n` +
-            `👤 Dilaporkan: \`${reportedId}\`\n` +
-            `⚠️ Alasan: *${reason}*\n` +
-            `⏰ Waktu: ${new Date().toLocaleString()}`,
-            { 
-                parse_mode: 'Markdown',
-                reply_markup: {
-                    inline_keyboard: [
-                        [
-                            { text: '🚫 Blokir Pengguna', callback_data: `admin_ban_${reportedId}` },
-                            { text: '✅ Abaikan', callback_data: 'admin_ignore_report' }
-                        ]
-                    ]
-                }
+                saveData();
+
+                await bot.editMessageText(`✅ Gender Anda telah diatur ke *${gender}*\n\n👀 sekarang mulailah chatting!`, {
+                    parse_mode: 'Markdown',
+                    chat_id: message.chat.id,
+                    message_id: message.message_id
+                });
+                break;
             }
-        );
 
-        // Simpan ID pesan laporan agar bisa dihapus nanti
-        reportMessages[reportedId] = reportMessage.message_id;
+            // Report Handling
+            case callbackData.startsWith('report_'): {
+                const [, reportedId, reason] = callbackData.split('_');
+                const reporterId = from.id.toString();
 
-        // Konfirmasi ke pengguna
-        await bot.answerCallbackQuery(callbackQuery.id, { 
-            text: '✅ Laporan Anda telah dikirim ke admin' 
-        });
+                // Validate reason and ID
+                if (!reason || !reportedId) {
+                    await bot.answerCallbackQuery(callbackQuery.id, { text: '❌ Laporan tidak valid' });
+                    return;
+                }
 
-        // Hapus pesan inline keyboard laporan
-        await bot.deleteMessage(
-            callbackQuery.message.chat.id, 
-            callbackQuery.message.message_id
-        );
+                // Check if user has already reported this user
+                if (!data.reports) data.reports = {};
+                if (data.reports[reporterId] && data.reports[reporterId].includes(reportedId)) {
+                    await bot.answerCallbackQuery(callbackQuery.id, { text: '⚠️ Anda sudah pernah melaporkan pengguna ini' });
+                    return;
+                }
 
-        // Simpan perubahan data
-        saveData();
+                // Custom report logic
+                if (reason === 'custom') {
+                    userReportState[reporterId] = {
+                        reportedUserId: reportedId,
+                        awaitingCustomReport: true
+                    };
 
-    } catch (error) {
-        console.error('Error processing report:', error);
-        bot.answerCallbackQuery(callbackQuery.id, { 
-            text: '❌ Gagal mengirim laporan' 
-        });
-    }
-    break;
-}
+                    await bot.sendMessage(
+                        callbackQuery.message.chat.id, 
+                        '📝 Silakan tulis alasan laporan secara detail:'
+                    );
 
-bot.on('callback_query', async (callbackQuery) => {
-    const data = callbackQuery.data;
+                    await bot.deleteMessage(
+                        callbackQuery.message.chat.id, 
+                        callbackQuery.message.message_id
+                    );
 
-    if (data.startsWith('admin_ban_')) {
-        const userId = data.split('_')[2];
+                    await bot.answerCallbackQuery(callbackQuery.id);
+                    return;
+                }
 
-        // Logika untuk menambah pengguna ke dalam daftar banned
-        if (!data.banned) data.banned = [];
-        data.banned.push(userId);
+                // Process standard report
+                if (!data.reports[reporterId]) {
+                    data.reports[reporterId] = [];
+                }
+                data.reports[reporterId].push(reportedId);
 
-        // Simpan perubahan data (misalnya data bans)
-        saveData();
+                const reportMessage = await bot.sendMessage(
+                    adminId,
+                    `📣 *Laporan Pengguna Baru*\n\n` +
+                    `👤 Pelapor: \`${reporterId}\`\n` +
+                    `👤 Dilaporkan: \`${reportedId}\`\n` +
+                    `⚠️ Alasan: *${reason}*\n` +
+                    `⏰ Waktu: ${new Date().toLocaleString()}`,
+                    { 
+                        parse_mode: 'Markdown',
+                        reply_markup: {
+                            inline_keyboard: [
+                                [
+                                    { text: '🚫 Blokir Pengguna', callback_data: `admin_ban_${reportedId}` },
+                                    { text: '✅ Abaikan', callback_data: 'admin_ignore_report' }
+                                ]
+                            ]
+                        }
+                    }
+                );
 
-        // Hapus laporan yang ada
-        if (reportMessages[userId]) {
-            await bot.deleteMessage(callbackQuery.message.chat.id, reportMessages[userId]);
-            delete reportMessages[userId]; // Hapus dari penyimpanan
-        }
+                // Store report message ID
+                reportMessages[reportedId] = reportMessage.message_id;
 
-        await bot.answerCallbackQuery(callbackQuery.id, { text: '🚫 Pengguna berhasil diblokir' });
-    }
+                await bot.answerCallbackQuery(callbackQuery.id, { 
+                    text: '✅ Laporan Anda telah dikirim ke admin' 
+                });
 
-    if (data === 'admin_ignore_report') {
-        // Hapus laporan jika admin memilih abaikan
-        const reportedId = callbackQuery.message.text.match(/Dilaporkan: `(\d+)`/)[1];
-        if (reportMessages[reportedId]) {
-            await bot.deleteMessage(callbackQuery.message.chat.id, reportMessages[reportedId]);
-            delete reportMessages[reportedId]; // Hapus dari penyimpanan
-        }
+                await bot.deleteMessage(
+                    callbackQuery.message.chat.id, 
+                    callbackQuery.message.message_id
+                );
 
-        await bot.answerCallbackQuery(callbackQuery.id, { text: '✅ Laporan diabaikan' });
-    }
-});
-        // Quick Help
-        case callbackData === 'quick_help': {
-            const quickHelp = `
+                saveData();
+                break;
+            }
+
+            // Admin Actions
+            case callbackData.startsWith('admin_ban_'): {
+                const userId = callbackData.split('_')[2];
+
+                // Add user to banned list
+                if (!data.banned) data.banned = [];
+                if (!data.banned.includes(userId)) {
+                    data.banned.push(userId);
+                }
+
+                saveData();
+
+                // Remove report message if exists
+                if (reportMessages[userId]) {
+                    try {
+                        await bot.deleteMessage(callbackQuery.message.chat.id, reportMessages[userId]);
+                        delete reportMessages[userId];
+                    } catch (error) {
+                        console.error('Error deleting report message:', error);
+                    }
+                }
+
+                await bot.answerCallbackQuery(callbackQuery.id, { text: '🚫 Pengguna berhasil diblokir' });
+                
+                // Notify banned user
+                try {
+                    await bot.sendMessage(userId, '❌ Anda telah diblokir oleh admin. Hubungi tim support untuk informasi lebih lanjut.');
+                } catch (error) {
+                    console.log(`Tidak dapat mengirim pesan ke ${userId}`);
+                }
+                break;
+            }
+
+            case callbackData === 'admin_ignore_report': {
+                // Remove report message
+                const reportedId = callbackQuery.message.text.match(/Dilaporkan: `(\d+)`/)[1];
+                
+                if (reportMessages[reportedId]) {
+                    try {
+                        await bot.deleteMessage(callbackQuery.message.chat.id, reportMessages[reportedId]);
+                        delete reportMessages[reportedId];
+                    } catch (error) {
+                        console.error('Error deleting report message:', error);
+                    }
+                }
+
+                await bot.answerCallbackQuery(callbackQuery.id, { text: '✅ Laporan diabaikan' });
+                break;
+            }
+
+            // Existing Cases (Quick Help, Full Rules)
+            case callbackData === 'quick_help': {
+                const quickHelp = `
 *✳️ Panduan Singkat Anonymous Chat @anontelerobot*
 
 1️⃣ Atur gender dengan \`/setgender\` 🔔
@@ -392,17 +395,16 @@ bot.on('callback_query', async (callbackQuery) => {
 • Chat bersifat anonim ✅
 • Nikmatilah pengalaman chatting! 🤩
 `;
-            bot.editMessageText(quickHelp, {
-                parse_mode: 'Markdown',
-                chat_id: message.chat.id,
-                message_id: message.message_id
-            });
-            break;
-        }
+                await bot.editMessageText(quickHelp, {
+                    parse_mode: 'Markdown',
+                    chat_id: message.chat.id,
+                    message_id: message.message_id
+                });
+                break;
+            }
 
-        // Full Rules
-        case callbackData === 'full_rules': {
-            const fullRules = `
+            case callbackData === 'full_rules': {
+                const fullRules = `
 *⚖️ Peraturan Lengkap Anonymous Chat @anontelerobot*
 
 🔹 *👀 Ketentuan Umum:*
@@ -428,19 +430,58 @@ bot.on('callback_query', async (callbackQuery) => {
 • Identitas asli tidak pernah dibagikan ✅
 • Percakapan bersifat sementara ✅
 `;
-            bot.editMessageText(fullRules, {
-                parse_mode: 'Markdown',
-                chat_id: message.chat.id,
-                message_id: message.message_id
-            });
-            break;
-        }
+                await bot.editMessageText(fullRules, {
+                    parse_mode: 'Markdown',
+                    chat_id: message.chat.id,
+                    message_id: message.message_id
+                });
+                break;
+            }
 
-        default: {
-            bot.answerCallbackQuery(callbackQuery.id, { text: '⚠️ Callback tidak dikenali.' });
-            break;
+            default: {
+                await bot.answerCallbackQuery(callbackQuery.id, { text: '⚠️ Callback tidak dikenali.' });
+                break;
+            }
         }
+    } catch (error) {
+        console.error('Error in callback query:', error);
+        await bot.answerCallbackQuery(callbackQuery.id, { text: '❌ Terjadi kesalahan' });
     }
+});
+
+// Tambahkan admin command untuk melihat statistik pengguna
+bot.onText(/\/userlist/, (msg) => {
+    // Pastikan hanya admin yang bisa menggunakan perintah ini
+    if (msg.from.id.toString() !== adminId.toString()) {
+        bot.sendMessage(msg.chat.id, '❌ Anda tidak memiliki izin untuk menggunakan perintah ini.');
+        return;
+    }
+
+    const activeUsers = Object.entries(data.users)
+        .filter(([_, user]) => user.gender) // Filter users with gender set
+        .map(([userId, user]) => {
+            const status = user.partner ? 'Terhubung' : 'Tidak terhubung';
+            const banned = data.banned && data.banned.includes(userId) ? '🚫 Banned' : '✅ Aktif';
+            return `👤 ID: ${userId}\n💡 Gender: ${user.gender}\n🔗 Status: ${status}\n⚙️ Kondisi: ${banned}`;
+        })
+        .join('\n\n');
+
+    const stats = {
+        total: Object.keys(data.users).length,
+        withGender: Object.values(data.users).filter(u => u.gender).length,
+        connected: Object.values(data.users).filter(u => u.partner).length,
+        banned: data.banned ? data.banned.length : 0
+    };
+
+    const statsMessage = 
+        `📊 *Statistik Pengguna*\n\n` +
+        `📌 Total Pengguna: ${stats.total}\n` +
+        `🧩 Pengguna Dengan Gender: ${stats.withGender}\n` +
+        `🔗 Pengguna Terhubung: ${stats.connected}\n` +
+        `🚫 Pengguna Banned: ${stats.banned}\n\n` +
+        `*📋 Daftar Pengguna:*\n\n${activeUsers}`;
+
+    bot.sendMessage(msg.chat.id, statsMessage, { parse_mode: 'Markdown' });
 });
 
 const searchingQueue = []; // Queue untuk menyimpan ID pengguna yang sedang mencari
