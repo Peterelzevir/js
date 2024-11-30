@@ -1,37 +1,51 @@
 const TelegramBot = require('node-telegram-bot-api');
 const fs = require('fs');
+const path = require('path');
 
 // Token from BotFather
 const token = '7354627036:AAGwOUhPZz5-bomZcsTw9K_KAZJjzMYRbgk';
 const bot = new TelegramBot(token, { polling: true });
-const adminId = 5988451717; // Ubah ke number, bukan string
+const adminId = 5988451717; // Tetap sebagai number
 
-let data = { users: {}, banned: [] }; // Default initialization
+// Path file data
+const DATA_FILE = path.join(__dirname, 'data.json');
 
-// Function to save data
+// Fungsi untuk membaca data
+function readData() {
+    try {
+        if (fs.existsSync(DATA_FILE)) {
+            const rawData = fs.readFileSync(DATA_FILE, 'utf8');
+            return JSON.parse(rawData);
+        }
+    } catch (error) {
+        console.error("Error reading data.json:", error);
+    }
+    
+    // Default data jika file tidak ada atau error
+    return { 
+        users: {}, 
+        banned: [],
+        version: '1.0' 
+    };
+}
+
+// Inisialisasi data global
+let data = readData();
+
+// Fungsi untuk menyimpan data
 function saveData() {
     try {
-        fs.writeFileSync('data.json', JSON.stringify(data, null, 2));
+        fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
     } catch (error) {
         console.error("Error saving data:", error);
     }
 }
 
-// Try reading the data from 'data.json'
-try {
-    const rawData = fs.readFileSync('data.json', 'utf8');
-    data = rawData ? JSON.parse(rawData) : data;
-} catch (error) {
-    console.error("Error reading or parsing data.json:", error);
-}
-
-// Function to find a partner
+// Fungsi untuk mencari pasangan
 async function findPartner(userId) {
     const user = data.users[userId];
     
-    if (!user || !user.gender) {
-        return null;
-    }
+    if (!user || !user.gender) return null;
 
     const availableUsers = Object.values(data.users)
         .filter(u => 
@@ -44,21 +58,32 @@ async function findPartner(userId) {
     return availableUsers.length > 0 ? availableUsers[0].id : null;
 }
 
-// Middleware untuk menangani semua jenis media
+// Handler utama pesan
 bot.on('message', async (msg) => {
-    // Abaikan pesan dari admin atau pesan tanpa pengirim
-    if (!msg.from) return;
+    // Abaikan pesan sistem atau tanpa pengirim
+    if (!msg || !msg.from) return;
 
     const userId = msg.from.id.toString();
+
+    // Pastikan objek users ada
+    if (!data.users) {
+        data.users = {};
+    }
+
+    // Inisialisasi pengguna jika belum ada
+    if (!data.users[userId]) {
+        data.users[userId] = { 
+            id: userId, 
+            gender: null, 
+            partner: null 
+        };
+        saveData();
+    }
+
     const user = data.users[userId];
 
-    // Proses pesan /start
+    // Proses perintah /start
     if (msg.text === '/start') {
-        if (!data.users[userId]) {
-            data.users[userId] = { id: userId, gender: null, partner: null };
-            saveData();
-        }
-
         bot.sendMessage(
             msg.chat.id,
             `👋 *Selamat datang di Anonymous Chat! ✅*\n\n` +
@@ -72,7 +97,7 @@ bot.on('message', async (msg) => {
         return;
     }
 
-    // Cek apakah pengguna diblokir
+    // Cek blokir
     if (data.banned && data.banned.includes(userId)) {
         bot.sendMessage(msg.chat.id, '❌ Anda telah di-*banned* oleh admin', { parse_mode: 'Markdown' });
         return;
@@ -131,6 +156,13 @@ bot.on('message', async (msg) => {
         }
     }
 });
+
+// Pastikan proses exit tidak terjadi karena error
+process.on('uncaughtException', (error) => {
+    console.error('Uncaught Exception:', error);
+});
+
+
 
 // Sisanya dari script sebelumnya tetap sama... (tidak berubah)
 
