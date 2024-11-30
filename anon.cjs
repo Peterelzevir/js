@@ -107,58 +107,94 @@ bot.on('message', async (msg) => {
     if (data.banned && data.banned.includes(userId)) {
         bot.sendMessage(msg.chat.id, '❌ Anda telah di-*banned* oleh admin', { parse_mode: 'Markdown' });
         return;
+bot.on('message', async (msg) => {
+    if (!msg || !msg.from) return; // Abaikan pesan sistem atau tanpa pengirim
+
+    const userId = msg.from.id.toString();
+
+    // Inisialisasi objek pengguna jika belum ada
+    if (!data.users) data.users = {};
+    if (!data.users[userId]) {
+        data.users[userId] = {
+            id: userId,
+            gender: null,
+            partner: null
+        };
+        saveData();
     }
 
-    // Kirim pesan ke pasangan
+    const user = data.users[userId];
+
+    // Cek apakah pesan adalah perintah (command)
+    if (msg.text && msg.text.startsWith('/')) {
+        console.log(`Command ${msg.text} diterima dari user ${userId}.`);
+
+        // Tangani perintah /start
+        if (msg.text === '/start') {
+            bot.sendMessage(
+                msg.chat.id,
+                `👋 *Selamat datang di Anonymous Chat @anontelerobot! ✅*\n\n` +
+                `👀 Gunakan perintah berikut untuk memulai:\n` +
+                `👉 \`/next\` - Cari pasangan lain 👀\n` +
+                `👉 \`/stop\` - Akhiri chat 🙏🏻\n` +
+                `👉 \`/setgender\` - Atur gender 😎\n` +
+                `👉 \`/help\` - Bantuan 👀`,
+                { parse_mode: 'Markdown' }
+            );
+            return;
+        }
+
+        // Tangani perintah lainnya (misal /help, /next, dll.)
+        bot.sendMessage(msg.chat.id, `⚙️ Perintah \`${msg.text}\` diproses oleh bot.`);
+        return;
+    }
+
+    // Cek apakah pengguna diblokir
+    if (data.banned && data.banned.includes(userId)) {
+        bot.sendMessage(msg.chat.id, '❌ Anda telah di-*banned* oleh admin', { parse_mode: 'Markdown' });
+        return;
+    }
+
+    // Kirim pesan ke pasangan jika ada
     if (user && user.partner) {
         try {
             // Kirim berbagai jenis media
             if (msg.text) {
                 await bot.sendMessage(user.partner, msg.text);
-            }
-            else if (msg.photo) {
+            } else if (msg.photo) {
                 await bot.sendPhoto(user.partner, msg.photo[msg.photo.length - 1].file_id, {
                     caption: msg.caption || ''
                 });
-            }
-            else if (msg.sticker) {
+            } else if (msg.sticker) {
                 await bot.sendSticker(user.partner, msg.sticker.file_id);
-            }
-            else if (msg.document) {
+            } else if (msg.document) {
                 await bot.sendDocument(user.partner, msg.document.file_id, {
                     caption: msg.caption || ''
                 });
-            }
-            else if (msg.voice) {
+            } else if (msg.voice) {
                 await bot.sendVoice(user.partner, msg.voice.file_id);
-            }
-            else if (msg.video) {
+            } else if (msg.video) {
                 await bot.sendVideo(user.partner, msg.video.file_id, {
                     caption: msg.caption || ''
                 });
-            }
-            else if (msg.audio) {
+            } else if (msg.audio) {
                 await bot.sendAudio(user.partner, msg.audio.file_id, {
                     caption: msg.caption || ''
                 });
-            }
-            else if (msg.video_note) {
+            } else if (msg.video_note) {
                 await bot.sendVideoNote(user.partner, msg.video_note.file_id);
-            }
-            else if (msg.location) {
+            } else if (msg.location) {
                 await bot.sendLocation(user.partner, msg.location.latitude, msg.location.longitude);
-            }
-            else if (msg.contact) {
+            } else if (msg.contact) {
                 await bot.sendContact(user.partner, msg.contact.phone_number, msg.contact.first_name);
-            }
-            else if (msg.animation) {
+            } else if (msg.animation) {
                 await bot.sendAnimation(user.partner, msg.animation.file_id, {
                     caption: msg.caption || ''
                 });
             }
         } catch (error) {
             console.error('Gagal mengirim pesan ke pasangan:', error);
-            bot.sendMessage(userId, '❌ gagal mengirim pesan, mungkin pasangan telah keluar');
+            bot.sendMessage(userId, '❌ gagal mengirim pesan, mungkin pasangan telah keluar.');
         }
     }
 });
@@ -392,17 +428,15 @@ bot.onText(/\/stop/, (msg) => {
 
     if (user.partner) {
         const partnerId = user.partner;
-        
+
         // Reset partners
         user.partner = null;
         data.users[partnerId].partner = null;
-        
+
         saveData();
 
+        // Pesan untuk pengguna yang menghentikan chat
         bot.sendMessage(msg.chat.id, '❌ Chat berhasil dihentikan ✅\n\n👀 /next untuk mencari lagi 💬');
-        bot.sendMessage(partnerId, '❌ yahh, dia sudah menghentikan chat dengan kamu 😔\n\n👀 /next untuk mencari lagi 💬');
-
-        // Display report options
         bot.sendMessage(
             msg.chat.id,
             '🚨 Apakah Anda ingin melaporkan pasangan chat ini?',
@@ -414,6 +448,24 @@ bot.onText(/\/stop/, (msg) => {
                         [{ text: '💰 Pemerasan', callback_data: `report_${partnerId}_pemerasan` }],
                         [{ text: '❌ Scamming', callback_data: `report_${partnerId}_scamming` }],
                         [{ text: '✏️ Custom Report', callback_data: `report_${partnerId}_custom` }],
+                    ],
+                },
+            }
+        );
+
+        // Pesan untuk pasangan yang dihentikan chat-nya
+        bot.sendMessage(partnerId, '❌ yahh dia sudah menghentikan chat dengan kamu 😔\n\n👀 /next untuk mencari lagi 💬');
+        bot.sendMessage(
+            partnerId,
+            '🚨 Apakah Anda ingin melaporkan pasangan chat ini?',
+            {
+                reply_markup: {
+                    inline_keyboard: [
+                        [{ text: '⚠️ Kekerasan', callback_data: `report_${userId}_kekerasan` }],
+                        [{ text: '🔞 Pornografi', callback_data: `report_${userId}_pornografi` }],
+                        [{ text: '💰 Pemerasan', callback_data: `report_${userId}_pemerasan` }],
+                        [{ text: '❌ Scamming', callback_data: `report_${userId}_scamming` }],
+                        [{ text: '✏️ Custom Report', callback_data: `report_${userId}_custom` }],
                     ],
                 },
             }
