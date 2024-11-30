@@ -4,7 +4,7 @@ const fs = require('fs');
 // Token from BotFather
 const token = '7354627036:AAGwOUhPZz5-bomZcsTw9K_KAZJjzMYRbgk';
 const bot = new TelegramBot(token, { polling: true });
-const adminId = '5988451717'; // Admin ID
+const adminId = 5988451717; // Ubah ke number, bukan string
 
 let data = { users: {}, banned: [] }; // Default initialization
 
@@ -44,19 +44,16 @@ async function findPartner(userId) {
     return availableUsers.length > 0 ? availableUsers[0].id : null;
 }
 
-// Middleware to check banned users
-bot.on('message', (msg) => {
-    // Ignore messages from banned users or non-text messages
-    if (!msg.text) return;
+// Middleware untuk menangani semua jenis media
+bot.on('message', async (msg) => {
+    // Abaikan pesan dari admin atau pesan tanpa pengirim
+    if (!msg.from) return;
 
-    if (data.banned && data.banned.includes(msg.from.id.toString())) {
-        bot.sendMessage(msg.chat.id, '❌ Anda telah di-*banned* oleh admin\n\n👀 chat admin now!');
-        return;
-    }
+    const userId = msg.from.id.toString();
+    const user = data.users[userId];
 
-    // Check for `/start` command
+    // Proses pesan /start
     if (msg.text === '/start') {
-        const userId = msg.from.id.toString();
         if (!data.users[userId]) {
             data.users[userId] = { id: userId, gender: null, partner: null };
             saveData();
@@ -72,15 +69,70 @@ bot.on('message', (msg) => {
             `👉 \`/help\` - Bantuan 👀`,
             { parse_mode: 'Markdown' }
         );
+        return;
     }
 
-    // Forward messages between partners
-    const userId = msg.from.id.toString();
-    const user = data.users[userId];
+    // Cek apakah pengguna diblokir
+    if (data.banned && data.banned.includes(userId)) {
+        bot.sendMessage(msg.chat.id, '❌ Anda telah di-*banned* oleh admin', { parse_mode: 'Markdown' });
+        return;
+    }
+
+    // Kirim pesan ke pasangan
     if (user && user.partner) {
-        bot.sendMessage(user.partner, msg.text);
+        try {
+            // Kirim berbagai jenis media
+            if (msg.text) {
+                await bot.sendMessage(user.partner, msg.text);
+            }
+            else if (msg.photo) {
+                await bot.sendPhoto(user.partner, msg.photo[msg.photo.length - 1].file_id, {
+                    caption: msg.caption || ''
+                });
+            }
+            else if (msg.sticker) {
+                await bot.sendSticker(user.partner, msg.sticker.file_id);
+            }
+            else if (msg.document) {
+                await bot.sendDocument(user.partner, msg.document.file_id, {
+                    caption: msg.caption || ''
+                });
+            }
+            else if (msg.voice) {
+                await bot.sendVoice(user.partner, msg.voice.file_id);
+            }
+            else if (msg.video) {
+                await bot.sendVideo(user.partner, msg.video.file_id, {
+                    caption: msg.caption || ''
+                });
+            }
+            else if (msg.audio) {
+                await bot.sendAudio(user.partner, msg.audio.file_id, {
+                    caption: msg.caption || ''
+                });
+            }
+            else if (msg.video_note) {
+                await bot.sendVideoNote(user.partner, msg.video_note.file_id);
+            }
+            else if (msg.location) {
+                await bot.sendLocation(user.partner, msg.location.latitude, msg.location.longitude);
+            }
+            else if (msg.contact) {
+                await bot.sendContact(user.partner, msg.contact.phone_number, msg.contact.first_name);
+            }
+            else if (msg.animation) {
+                await bot.sendAnimation(user.partner, msg.animation.file_id, {
+                    caption: msg.caption || ''
+                });
+            }
+        } catch (error) {
+            console.error('Gagal mengirim pesan ke pasangan:', error);
+            bot.sendMessage(userId, '❌ gagal mengirim pesan, mungkin pasangan telah keluar');
+        }
     }
 });
+
+// Sisanya dari script sebelumnya tetap sama... (tidak berubah)
 
 // /setgender command
 bot.onText(/\/setgender/, (msg) => {
@@ -281,77 +333,7 @@ bot.onText(/\/broadcast/, async (msg) => {
     );
 });
 
-bot.on('message', async (msg) => {
-    // Abaikan pesan dari admin atau pesan tanpa pengirim
-    if (!msg.from) return;
-
-    const userId = msg.from.id.toString();
-    const user = data.users[userId];
-
-    // Pastikan pengguna sudah terhubung dengan pasangan
-    if (user && user.partner) {
-        try {
-            // Kirim pesan teks
-            if (msg.text) {
-                await bot.sendMessage(user.partner, msg.text);
-            }
-            // Kirim foto
-            else if (msg.photo) {
-                await bot.sendPhoto(user.partner, msg.photo[msg.photo.length - 1].file_id, {
-                    caption: msg.caption || ''
-                });
-            }
-            // Kirim sticker
-            else if (msg.sticker) {
-                await bot.sendSticker(user.partner, msg.sticker.file_id);
-            }
-            // Kirim dokumen/file
-            else if (msg.document) {
-                await bot.sendDocument(user.partner, msg.document.file_id, {
-                    caption: msg.caption || ''
-                });
-            }
-            // Kirim audio/voice note
-            else if (msg.voice) {
-                await bot.sendVoice(user.partner, msg.voice.file_id);
-            }
-            // Kirim video
-            else if (msg.video) {
-                await bot.sendVideo(user.partner, msg.video.file_id, {
-                    caption: msg.caption || ''
-                });
-            }
-            // Kirim audio 
-            else if (msg.audio) {
-                await bot.sendAudio(user.partner, msg.audio.file_id, {
-                    caption: msg.caption || ''
-                });
-            }
-            // Kirim video note (video bulat)
-            else if (msg.video_note) {
-                await bot.sendVideoNote(user.partner, msg.video_note.file_id);
-            }
-            // Kirim lokasi
-            else if (msg.location) {
-                await bot.sendLocation(user.partner, msg.location.latitude, msg.location.longitude);
-            }
-            // Kirim kontak
-            else if (msg.contact) {
-                await bot.sendContact(user.partner, msg.contact.phone_number, msg.contact.first_name);
-            }
-            // Kirim animasi/gif
-            else if (msg.animation) {
-                await bot.sendAnimation(user.partner, msg.animation.file_id, {
-                    caption: msg.caption || ''
-                });
-            }
-        } catch (error) {
-            console.error('Gagal mengirim pesan ke pasangan:', error);
-            bot.sendMessage(userId, '❌ gagal mengirim pesan, mungkin pasangan telah keluar');
-        }
-    }
-});
-
+//cek
 bot.on("polling_error", (error) => {
     console.error("Polling error:", error);
 });
