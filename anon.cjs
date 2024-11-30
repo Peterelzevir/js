@@ -228,10 +228,8 @@ bot.on('callback_query', async (callbackQuery) => {
             { parse_mode: 'Markdown' }
         );
 
-        bot.answerCallbackQuery(callbackQuery.id, { text: '✅ Laporan Anda telah dikirim ke admin.' });
+        bot.answerCallbackQuery(callbackQuery.id, { text: '✅ Laporan Anda telah dikirim ke admin' });
     }
-});
-
 // /next (Cari Pasangan)
 bot.onText(/\/next/, async (msg) => {
     const userId = msg.from.id.toString();
