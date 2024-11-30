@@ -58,7 +58,15 @@ async function findPartner(userId) {
     return availableUsers.length > 0 ? availableUsers[0].id : null;
 }
 
+
+
+// Pastikan proses exit tidak terjadi karena error
+process.on('uncaughtException', (error) => {
+    console.error('Uncaught Exception:', error);
+});
+
 bot.on('message', async (msg) => {
+    // Cek apakah pesan valid
     if (!msg || !msg.from) return; // Abaikan pesan sistem atau tanpa pengirim
 
     const userId = msg.from.id.toString();
@@ -73,8 +81,58 @@ bot.on('message', async (msg) => {
         };
         saveData();
     }
-
     const user = data.users[userId];
+
+    // Handler untuk laporan custom
+    if (userReportState[userId] && userReportState[userId].awaitingCustomReport) {
+        const reportedUserId = userReportState[userId].reportedUserId;
+        const customReportMessage = msg.text;
+
+        try {
+            // Kirim laporan custom ke admin
+            await bot.sendMessage(
+                adminId,
+                `📣 *Laporan Custom Pengguna*\n\n` +
+                `👤 Pelapor: \`${userId}\`\n` +
+                `👤 Dilaporkan: \`${reportedUserId}\`\n` +
+                `⚠️ Alasan: *Custom Report*\n` +
+                `📄 Pesan: "${customReportMessage}"\n` +
+                `⏰ Waktu: ${new Date().toLocaleString()}`,
+                { 
+                    parse_mode: 'Markdown',
+                    reply_markup: {
+                        inline_keyboard: [
+                            [
+                                { text: '🚫 Blokir Pengguna', callback_data: `admin_ban_${reportedUserId}` },
+                                { text: '✅ Abaikan', callback_data: 'admin_ignore_report' }
+                            ]
+                        ]
+                    }
+                }
+            );
+
+            // Hapus pesan laporan
+            await bot.deleteMessage(msg.chat.id, msg.message_id);
+
+            // Konfirmasi ke pengguna
+            await bot.sendMessage(msg.chat.id, '✅ Laporan custom berhasil dikirim');
+
+            // Reset state
+            delete userReportState[userId];
+
+            // Kembalikan dari fungsi untuk mencegah pemrosesan lebih lanjut
+            return;
+        } catch (error) {
+            console.error('Error processing custom report:', error);
+            await bot.sendMessage(msg.chat.id, '❌ Gagal mengirim laporan');
+            
+            // Reset state
+            delete userReportState[userId];
+            
+            // Kembalikan dari fungsi untuk mencegah pemrosesan lebih lanjut
+            return;
+        }
+    }
 
     // Cek apakah pesan adalah perintah (command)
     if (msg.text && msg.text.startsWith('/')) {
@@ -84,7 +142,7 @@ bot.on('message', async (msg) => {
         if (msg.text === '/start') {
             bot.sendMessage(
                 msg.chat.id,
-                `👋 *Selamat datang di Anonymous Chat @anontelerobot! ✅*\n\n` +
+                `👋 Selamat datang di Anonymous Chat @anontelerobot! ✅\n\n` +
                 `👀 Gunakan perintah berikut untuk memulai:\n` +
                 `👉 \`/next\` - Cari pasangan lain 👀\n` +
                 `👉 \`/stop\` - Akhiri chat 🙏🏻\n` +
@@ -94,6 +152,7 @@ bot.on('message', async (msg) => {
             );
             return;
         }
+    }
 
     // Cek apakah pengguna diblokir
     if (data.banned && data.banned.includes(userId)) {
@@ -144,13 +203,6 @@ bot.on('message', async (msg) => {
         }
     }
 });
-
-// Pastikan proses exit tidak terjadi karena error
-process.on('uncaughtException', (error) => {
-    console.error('Uncaught Exception:', error);
-});
-
-
 
 // Sisanya dari script sebelumnya tetap sama... (tidak berubah)
 
@@ -474,52 +526,6 @@ bot.on('callback_query', async (callbackQuery) => {
 
     if (data === 'admin_ignore_report') {
         await bot.answerCallbackQuery(callbackQuery.id, { text: '✅ Laporan diabaikan' });
-    }
-});
-
-bot.on('message', async (msg) => {
-    const userId = msg.from.id.toString();
-    
-    if (userReportState[userId] && userReportState[userId].awaitingCustomReport) {
-        const reportedUserId = userReportState[userId].reportedUserId;
-        const customReportMessage = msg.text;
-
-        try {
-            // Kirim laporan custom ke admin
-            await bot.sendMessage(
-                adminId,
-                `📣 *Laporan Custom Pengguna*\n\n` +
-                `👤 Pelapor: \`${userId}\`\n` +
-                `👤 Dilaporkan: \`${reportedUserId}\`\n` +
-                `⚠️ Alasan: *Custom Report*\n` +
-                `📄 Pesan: "${customReportMessage}"\n` +
-                `⏰ Waktu: ${new Date().toLocaleString()}`,
-                { 
-                    parse_mode: 'Markdown',
-                    reply_markup: {
-                        inline_keyboard: [
-                            [
-                                { text: '🚫 Blokir Pengguna', callback_data: `admin_ban_${reportedUserId}` },
-                                { text: '✅ Abaikan', callback_data: 'admin_ignore_report' }
-                            ]
-                        ]
-                    }
-                }
-            );
-
-            // Hapus pesan laporan
-            await bot.deleteMessage(msg.chat.id, msg.message_id);
-
-            // Konfirmasi ke pengguna
-            await bot.sendMessage(msg.chat.id, '✅ Laporan custom berhasil dikirim');
-
-            // Reset state
-            delete userReportState[userId];
-
-        } catch (error) {
-            console.error('Error processing custom report:', error);
-            await bot.sendMessage(msg.chat.id, '❌ Gagal mengirim laporan');
-        }
     }
 });
 
