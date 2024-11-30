@@ -183,53 +183,117 @@ bot.onText(/\/setgender/, (msg) => {
 });
 
 bot.on('callback_query', async (callbackQuery) => {
-    const { data: callbackData, message } = callbackQuery;
-    const userId = message.from.id.toString();
+    const { data: callbackData, message, from } = callbackQuery;
+    const userId = from.id.toString();
 
-    // Pastikan `data.users` ada
-    if (!data.users) {
-        data.users = {};
-    }
+    // Pastikan data.users ada
+    if (!data.users) data.users = {};
+    if (!data.users[userId]) data.users[userId] = {}; // Buat objek baru jika belum ada
 
-    // Pastikan `data.users[userId]` ada
-    if (!data.users[userId]) {
-        data.users[userId] = {}; // Buat objek baru untuk user jika belum ada
-    }
+    switch (true) {
+        // Gender Selection
+        case callbackData === 'gender_male' || callbackData === 'gender_female': {
+            const gender = callbackData === 'gender_male' ? 'Pria' : 'Wanita';
+            data.users[userId].gender = gender;
 
-    // Gender selection
-    if (callbackData === 'gender_male' || callbackData === 'gender_female') {
-        const gender = callbackData === 'gender_male' ? 'Pria' : 'Wanita';
-        data.users[userId].gender = gender;
+            saveData(); // Pastikan fungsi saveData() berfungsi
 
-        saveData(); // Pastikan fungsi saveData() bekerja dengan benar
+            bot.editMessageText(`✅ Gender Anda telah diatur ke *${gender}*.`, {
+                parse_mode: 'Markdown',
+                chat_id: message.chat.id,
+                message_id: message.message_id
+            });
+            break;
+        }
 
-        bot.editMessageText(`✅ Gender Anda telah diatur ke *${gender}*.`, { 
-            parse_mode: 'Markdown', 
-            chat_id: message.chat.id, 
-            message_id: message.message_id 
-        });
+        // Report Handling
+        case callbackData.startsWith('report_'): {
+            const [, reportedId, reason] = callbackData.split('_');
+
+            // Validasi alasan
+            if (!reason) return;
+
+            const reporterId = callbackQuery.from.id.toString();
+
+            bot.sendMessage(
+                adminId,
+                `📣 *Laporan Pengguna*\n\n` +
+                `👤 *Pelapor:* ${reporterId}\n` +
+                `👤 *Dilaporkan:* ${reportedId}\n` +
+                `⚠️ *Alasan:* ${reason}`,
+                { parse_mode: 'Markdown' }
+            );
+
+            bot.answerCallbackQuery(callbackQuery.id, { text: '✅ Laporan Anda telah dikirim ke admin' });
+            break;
+        }
+
+        // Quick Help
+        case callbackData === 'quick_help': {
+            const quickHelp = `
+*🚀 Panduan Singkat Anonymous Chat*
+
+1️⃣ Atur gender dengan \`/setgender\`
+2️⃣ Temukan pasangan dengan \`/next\`
+3️⃣ Mulai mengobrol!
+4️⃣ Gunakan \`/stop\` untuk mengakhiri
+
+*Tips:*
+• Selalu bersikap sopan
+• Chat bersifat anonim
+• Nikmatilah pengalaman chatting!
+`;
+            bot.editMessageText(quickHelp, {
+                parse_mode: 'Markdown',
+                chat_id: message.chat.id,
+                message_id: message.message_id
+            });
+            break;
+        }
+
+        // Full Rules
+        case callbackData === 'full_rules': {
+            const fullRules = `
+*⚖️ Peraturan Lengkap Anonymous Chat*
+
+🔹 *Ketentuan Umum:*
+• Wajib mengatur gender sebelum chat
+• Satu kali pengaturan gender
+• Dilarang mengirim konten pornografi
+• Dilarang melakukan pemerasan/scamming
+• Hormati privasi pasangan chat
+
+🔹 *Konsekuensi Pelanggaran:*
+• Pelanggaran ringan: Peringatan
+• Pelanggaran berat: Banned permanen
+• Admin berhak memblokir tanpa pemberitahuan
+
+🔹 *Etika Chatting:*
+• Gunakan bahasa santun
+• Tidak boleh meminta data pribadi
+• Tidak boleh menghina/melecehkan
+• Fokus pada percakapan yang sehat
+
+🔹 *Privasi:*
+• Hanya gender yang terlihat
+• Identitas asli tidak pernah dibagikan
+• Percakapan bersifat sementara
+`;
+            bot.editMessageText(fullRules, {
+                parse_mode: 'Markdown',
+                chat_id: message.chat.id,
+                message_id: message.message_id
+            });
+            break;
+        }
+
+        default: {
+            bot.answerCallbackQuery(callbackQuery.id, { text: '⚠️ Callback tidak dikenali.' });
+            break;
+        }
     }
 });
-    // Report handling
-    if (callbackData.startsWith('report_')) {
-        const [, reportedId, reason] = callbackData.split('_');
-        
-        // Ensure the reason is valid
-        if (!reason) return;
 
-        const reporterId = callbackQuery.from.id.toString();
-
-        bot.sendMessage(
-            adminId,
-            `📣 *Laporan Pengguna*\n\n` +
-            `👤 *Pelapor:* ${reporterId}\n` +
-            `👤 *Dilaporkan:* ${reportedId}\n` +
-            `⚠️ *Alasan:* ${reason}`,
-            { parse_mode: 'Markdown' }
-        );
-
-        bot.answerCallbackQuery(callbackQuery.id, { text: '✅ Laporan Anda telah dikirim ke admin' });
-    }
 // /next (Cari Pasangan)
 bot.onText(/\/next/, async (msg) => {
     const userId = msg.from.id.toString();
@@ -370,66 +434,6 @@ bot.onText(/\/help/, (msg) => {
             ]
         }
     });
-});
-
-// Tambahkan handler untuk callback query help
-bot.on('callback_query', async (callbackQuery) => {
-    const { data: callbackData, message } = callbackQuery;
-
-    if (callbackData === 'quick_help') {
-        const quickHelp = `
-*🚀 Panduan Singkat Anonymous Chat*
-
-1️⃣ Atur gender dengan \`/setgender\`
-2️⃣ Temukan pasangan dengan \`/next\`
-3️⃣ Mulai mengobrol!
-4️⃣ Gunakan \`/stop\` untuk mengakhiri
-
-*Tips:*
-• Selalu bersikap sopan
-• Chat bersifat anonim
-• Nikmatilah pengalaman chatting!
-`;
-        bot.editMessageText(quickHelp, { 
-            parse_mode: 'Markdown', 
-            chat_id: message.chat.id, 
-            message_id: message.message_id 
-        });
-    }
-
-    if (callbackData === 'full_rules') {
-        const fullRules = `
-*⚖️ Peraturan Lengkap Anonymous Chat*
-
-🔹 *Ketentuan Umum:*
-• Wajib mengatur gender sebelum chat
-• Satu kali pengaturan gender
-• Dilarang mengirim konten pornografi
-• Dilarang melakukan pemerasan/scamming
-• Hormati privasi pasangan chat
-
-🔹 *Konsekuensi Pelanggaran:*
-• Pelanggaran ringan: Peringatan
-• Pelanggaran berat: Banned permanen
-• Admin berhak memblokir tanpa pemberitahuan
-
-🔹 *Etika Chatting:*
-• Gunakan bahasa santun
-• Tidak boleh meminta data pribadi
-• Tidak boleh menghina/melecehkan
-• Fokus pada percakapan yang sehat
-
-🔹 *Privasi:*
-• Hanya gender yang terlihat
-• Identitas asli tidak pernah dibagikan
-• Percakapan bersifat sementara
-`;
-        bot.editMessageText(fullRules, { 
-            parse_mode: 'Markdown', 
-            chat_id: message.chat.id, 
-            message_id: message.message_id 
-        });
-    }
 });
 
 // Admin Command: /banned
