@@ -2,25 +2,30 @@ const TelegramBot = require('node-telegram-bot-api');
 const fs = require('fs');
 
 // Token from BotFather
-const token = '6980801253:AAGNgNDmnTp9AMEk0C3u4WH0qund-KQecik';
+const token = '7354627036:AAGwOUhPZz5-bomZcsTw9K_KAZJjzMYRbgk';
 const bot = new TelegramBot(token, { polling: true });
 const adminId = '5988451717'; // Admin ID
 
 let data;
 
-// Try reading the data from 'data.json'
-try {
-    const rawData = fs.readFileSync('data.json', 'utf8');
-    data = rawData ? JSON.parse(rawData) : { users: {}, banned: [] };
-} catch (error) {
-    console.error("Error reading or parsing data.json:", error);
-    data = { users: {}, banned: [] }; // Initialize with default structure on error
+// Function to initialize data from 'data.json'
+function initializeData() {
+    try {
+        const rawData = fs.readFileSync('data.json', 'utf8');
+        data = rawData ? JSON.parse(rawData) : { users: {}, banned: [] };
+    } catch (error) {
+        console.error("Error reading or parsing data.json:", error);
+        data = { users: {}, banned: [] }; // Initialize with default structure on error
+    }
 }
 
 // Function to save data to 'data.json'
 function saveData() {
     fs.writeFileSync('data.json', JSON.stringify(data, null, 2));
 }
+
+// Initialize data on startup
+initializeData();
 
 // Middleware to check banned users
 bot.on('message', (msg) => {
@@ -70,14 +75,11 @@ bot.on('callback_query', (callbackQuery) => {
     const { data, message } = callbackQuery;
     const userId = message.from.id;
 
-    if (data === 'gender_male') {
-        data.users[userId].gender = 'Pria';
+    if (data === 'gender_male' || data === 'gender_female') {
+        const gender = data === 'gender_male' ? 'Pria' : 'Wanita';
+        data.users[userId].gender = gender;
         saveData();
-        bot.editMessageText('✅ Gender Anda telah diatur ke *Pria*.', { parse_mode: 'Markdown', chat_id: message.chat.id, message_id: message.message_id });
-    } else if (data === 'gender_female') {
-        data.users[userId].gender = 'Wanita';
-        saveData();
-        bot.editMessageText('✅ Gender Anda telah diatur ke *Wanita*.', { parse_mode: 'Markdown', chat_id: message.chat.id, message_id: message.message_id });
+        bot.editMessageText(`✅ Gender Anda telah diatur ke *${gender}*.`, { parse_mode: 'Markdown', chat_id: message.chat.id, message_id: message.message_id });
     }
 });
 
@@ -93,11 +95,16 @@ bot.onText(/\/next/, async (msg) => {
 
     const searchMsg = await bot.sendMessage(msg.chat.id, '🔍 _Mencari pasangan..._', { parse_mode: 'Markdown' });
 
-    const partnerId = await findPartner(userId);
+    const partnerId = await findPartner(userId); // You need to implement this function
     if (partnerId) {
         await bot.deleteMessage(msg.chat.id, searchMsg.message_id);
         bot.sendMessage(msg.chat.id, '✨ *Pasangan ditemukan! Mulailah mengobrol.*', { parse_mode: 'Markdown' });
         bot.sendMessage(partnerId, '✨ *Pasangan ditemukan! Mulailah mengobrol.*', { parse_mode: 'Markdown' });
+        
+        // Update partners in the data structure
+        user.partner = partnerId;
+        data.users[partnerId].partner = userId;
+        saveData();
     } else {
         bot.sendMessage(msg.chat.id, '❌ Tidak ada pasangan yang tersedia saat ini. Coba lagi nanti.');
     }
@@ -110,8 +117,11 @@ bot.onText(/\/stop/, (msg) => {
 
     if (user.partner) {
         const partnerId = user.partner;
+        
+        // Reset partners
         user.partner = null;
         data.users[partnerId].partner = null;
+        
         saveData();
 
         bot.sendMessage(msg.chat.id, '❌ Chat dihentikan.');
@@ -141,6 +151,10 @@ bot.onText(/\/stop/, (msg) => {
 // Handle Report
 bot.on('callback_query', (callbackQuery) => {
     const [, reportedId, reason] = callbackQuery.data.split('_');
+    
+    // Ensure the reason is valid
+    if (!reason) return;
+
     const reporterId = callbackQuery.from.id;
 
     bot.sendMessage(
@@ -158,6 +172,8 @@ bot.on('callback_query', (callbackQuery) => {
 // /totaluser
 bot.onText(/\/totaluser/, (msg) => {
     const totalUsers = Object.keys(data.users).length;
+    
+    // Prepare user details for response
     const userDetails = Object.values(data.users)
         .map((u) => `👤 *ID:* ${u.id}\n💡 *Gender:* ${u.gender || 'Belum diatur'}\n🔗 *Status:* ${u.partner ? 'Terhubung' : 'Tidak terhubung'}`)
         .join('\n\n');
@@ -179,43 +195,49 @@ bot.onText(/\/broadcast/, async (msg) => {
     }
 
     const message = msg.reply_to_message;
+    
     if (!message) {
         bot.sendMessage(msg.chat.id, '❌ Balas pesan yang ingin Anda broadcast.');
         return;
     }
 
     const userIds = Object.keys(data.users);
+    
     let sent = 0;
     let failed = 0;
+    
     const progressMsg = await bot.sendMessage(msg.chat.id, `🔄 *Proses Broadcast...*\n📤 Berhasil: ${sent}\n❌ Gagal: ${failed}`, { parse_mode: 'Markdown' });
 
     for (const id of userIds) {
-        try {
-            if (message.text) {
-                await bot.sendMessage(id, message.text);
-            } else if (message.photo) {
-                await bot.sendPhoto(id, message.photo[0].file_id, { caption: message.caption });
-            } else if (message.video) {
-                await bot.sendVideo(id, message.video.file_id, { caption: message.caption });
-            }
-            sent++;
-        } catch {
-            failed++;
-        }
-        await bot.editMessageText(
-            progressMsg.chat.id,
-            progressMsg.message_id,
-            null,
-            `🔄 *Proses Broadcast...*\n📤 Berhasil: ${sent}\n❌ Gagal: ${failed}`,
-            { parse_mode: 'Markdown' }
-        );
-    }
+        
+         try {
+             if (message.text) {
+                 await bot.sendMessage(id, message.text);
+             } else if (message.photo) {
+                 await bot.sendPhoto(id, message.photo[0].file_id, { caption: message.caption });
+             } else if (message.video) {
+                 await bot.sendVideo(id, message.video.file_id, { caption: message.caption });
+             }
+             sent++;
+         } catch (error) {
+             console.error(`Failed to send message to ${id}:`, error);
+             failed++;
+         }
 
-    await bot.editMessageText(
-        progressMsg.chat.id,
-        progressMsg.message_id,
-        null,
-        `✅ *Broadcast selesai!*\n📤 Berhasil: ${sent}\n❌ Gagal: ${failed}`,
-        { parse_mode: 'Markdown' }
-    );
+         await bot.editMessageText(
+             progressMsg.chat.id,
+             progressMsg.message_id,
+             null,
+             `🔄 *Proses Broadcast...*\n📤 Berhasil: ${sent}\n❌ Gagal: ${failed}`,
+             { parse_mode: 'Markdown' }
+         );
+     }
+
+     await bot.editMessageText(
+         progressMsg.chat.id,
+         progressMsg.message_id,
+         null,
+         `✅ *Broadcast selesai!*\n📤 Berhasil: ${sent}\n❌ Gagal: ${failed}`,
+         { parse_mode: 'Markdown' }
+     );
 });
