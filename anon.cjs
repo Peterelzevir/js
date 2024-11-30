@@ -294,7 +294,8 @@ bot.on('callback_query', async (callbackQuery) => {
     }
 });
 
-// /next (Cari Pasangan)
+const searchingQueue = []; // Queue untuk menyimpan ID pengguna yang sedang mencari
+
 bot.onText(/\/next/, async (msg) => {
     const userId = msg.from.id.toString();
     const user = data.users[userId];
@@ -309,23 +310,74 @@ bot.onText(/\/next/, async (msg) => {
         return;
     }
 
+    // Cek apakah sudah dalam antrean pencarian
+    if (searchingQueue.includes(userId)) {
+        bot.sendMessage(msg.chat.id, '⚠️ Anda sudah dalam antrean pencarian.');
+        return;
+    }
+
+    // Tambahkan ke antrean pencarian
+    searchingQueue.push(userId);
+
     const searchMsg = await bot.sendMessage(msg.chat.id, '🔍 _Mencari pasangan..._', { parse_mode: 'Markdown' });
 
     const partnerId = await findPartner(userId);
+
     if (partnerId) {
         await bot.deleteMessage(msg.chat.id, searchMsg.message_id);
-        bot.sendMessage(msg.chat.id, '✨ *Pasangan ditemukan! Mulailah mengobrol.*', { parse_mode: 'Markdown' });
-        bot.sendMessage(partnerId, '✨ *Pasangan ditemukan! Mulailah mengobrol.*', { parse_mode: 'Markdown' });
-        
-        // Update partners in the data structure
+        bot.sendMessage(msg.chat.id, '✨ *Pasangan ditemukan! Mulailah mengobrol\n\n👀 /stop untuk akhiri chat*', { parse_mode: 'Markdown' });
+        bot.sendMessage(partnerId, '✨ *Pasangan ditemukan! Mulailah mengobrol\n\n👀 /stop untuk akhiri chat*', { parse_mode: 'Markdown' });
+
+        // Update pasangan
         data.users[userId].partner = partnerId;
         data.users[partnerId].partner = userId;
+
+        // Hapus kedua pengguna dari antrean pencarian
+        removeFromQueue(userId);
+        removeFromQueue(partnerId);
+
         saveData();
     } else {
-        await bot.deleteMessage(msg.chat.id, searchMsg.message_id);
-        bot.sendMessage(msg.chat.id, '❌ Tidak ada pasangan yang tersedia saat ini. Coba lagi nanti.');
+        // Tunggu selama 5 menit
+        setTimeout(async () => {
+            const stillSearching = searchingQueue.includes(userId);
+
+            if (stillSearching && !data.users[userId].partner) {
+                await bot.deleteMessage(msg.chat.id, searchMsg.message_id);
+                bot.sendMessage(msg.chat.id, '❌ Tidak ada pasangan yang tersedia. Pencarian dihentikan.');
+                removeFromQueue(userId); // Hapus dari antrean
+            }
+        }, 5 * 60 * 1000); // 5 menit
     }
 });
+
+// Fungsi untuk mencari pasangan
+async function findPartner(userId) {
+    const user = data.users[userId];
+
+    if (!user || !user.gender) return null;
+
+    for (const partnerId of searchingQueue) {
+        const partner = data.users[partnerId];
+
+        if (
+            partnerId !== userId && 
+            partner.gender && 
+            !partner.partner && 
+            partner.gender !== user.gender
+        ) {
+            return partnerId;
+        }
+    }
+
+    return null; // Tidak ada pasangan yang cocok
+}
+
+// Fungsi untuk menghapus pengguna dari antrean
+function removeFromQueue(userId) {
+    const index = searchingQueue.indexOf(userId);
+    if (index !== -1) searchingQueue.splice(index, 1);
+}
 
 // /stop (Hentikan Chat)
 bot.onText(/\/stop/, (msg) => {
