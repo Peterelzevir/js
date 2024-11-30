@@ -186,18 +186,30 @@ bot.on('callback_query', async (callbackQuery) => {
     const { data: callbackData, message } = callbackQuery;
     const userId = message.from.id.toString();
 
+    // Pastikan `data.users` ada
+    if (!data.users) {
+        data.users = {};
+    }
+
+    // Pastikan `data.users[userId]` ada
+    if (!data.users[userId]) {
+        data.users[userId] = {}; // Buat objek baru untuk user jika belum ada
+    }
+
     // Gender selection
     if (callbackData === 'gender_male' || callbackData === 'gender_female') {
         const gender = callbackData === 'gender_male' ? 'Pria' : 'Wanita';
         data.users[userId].gender = gender;
-        saveData();
+
+        saveData(); // Pastikan fungsi saveData() bekerja dengan benar
+
         bot.editMessageText(`✅ Gender Anda telah diatur ke *${gender}*.`, { 
             parse_mode: 'Markdown', 
             chat_id: message.chat.id, 
             message_id: message.message_id 
         });
     }
-
+});
     // Report handling
     if (callbackData.startsWith('report_')) {
         const [, reportedId, reason] = callbackData.split('_');
@@ -305,6 +317,216 @@ bot.onText(/\/totaluser/, (msg) => {
         `📊 *Total Pengguna:*\n\n` +
         `📌 Jumlah Pengguna: ${totalUsers} orang\n\n` +
         `${userDetails}`,
+        { parse_mode: 'Markdown' }
+    );
+});
+
+// /help command
+bot.onText(/\/help/, (msg) => {
+    const helpMessage = `
+*🤖 Anonymous Chat Bot - Panduan Lengkap* 
+
+*👤 Pengaturan Akun:*
+• \`/start\` - Memulai bot dan melihat petunjuk dasar
+• \`/setgender\` - Atur gender Anda (hanya sekali)
+
+*💬 Fitur Chat:*
+• \`/next\` - Temukan pasangan chat acak dengan gender berbeda
+• \`/stop\` - Akhiri percakapan saat ini
+   - Akan menawarkan opsi pelaporan setelah mengakhiri chat
+
+*🚨 Pelaporan:*
+• Saat menggunakan \`/stop\`, Anda dapat melaporkan pasangan dengan berbagai alasan:
+   - Kekerasan
+   - Pornografi
+   - Pemerasan
+   - Scamming
+   - Alasan Lainnya
+
+*ℹ️ Informasi:*
+• \`/totaluser\` - Lihat statistik total pengguna
+• Fitur rahasia: Chat Anda dijamin anonim!
+
+*⚠️ Peraturan Penting:*
+1. Hormati pasangan chat Anda
+2. Dilarang mengirim konten tidak pantas
+3. Satu kali pengaturan gender
+4. Admin dapat memblokir pengguna yang melanggar
+
+*🔒 Privasi:*
+• Tidak ada identitas pribadi yang tersimpan
+• Chat dijamin anonim
+• Hanya gender yang diketahui
+
+*🆘 Bantuan Tambahan:*
+• Jika mengalami masalah, hubungi admin
+• Pelanggaran dapat berakibat banned
+`;
+
+    bot.sendMessage(msg.chat.id, helpMessage, { 
+        parse_mode: 'Markdown',
+        reply_markup: {
+            inline_keyboard: [
+                [{ text: '❓ Panduan Singkat', callback_data: 'quick_help' }],
+                [{ text: '⚖️ Peraturan Lengkap', callback_data: 'full_rules' }]
+            ]
+        }
+    });
+});
+
+// Tambahkan handler untuk callback query help
+bot.on('callback_query', async (callbackQuery) => {
+    const { data: callbackData, message } = callbackQuery;
+
+    if (callbackData === 'quick_help') {
+        const quickHelp = `
+*🚀 Panduan Singkat Anonymous Chat*
+
+1️⃣ Atur gender dengan \`/setgender\`
+2️⃣ Temukan pasangan dengan \`/next\`
+3️⃣ Mulai mengobrol!
+4️⃣ Gunakan \`/stop\` untuk mengakhiri
+
+*Tips:*
+• Selalu bersikap sopan
+• Chat bersifat anonim
+• Nikmatilah pengalaman chatting!
+`;
+        bot.editMessageText(quickHelp, { 
+            parse_mode: 'Markdown', 
+            chat_id: message.chat.id, 
+            message_id: message.message_id 
+        });
+    }
+
+    if (callbackData === 'full_rules') {
+        const fullRules = `
+*⚖️ Peraturan Lengkap Anonymous Chat*
+
+🔹 *Ketentuan Umum:*
+• Wajib mengatur gender sebelum chat
+• Satu kali pengaturan gender
+• Dilarang mengirim konten pornografi
+• Dilarang melakukan pemerasan/scamming
+• Hormati privasi pasangan chat
+
+🔹 *Konsekuensi Pelanggaran:*
+• Pelanggaran ringan: Peringatan
+• Pelanggaran berat: Banned permanen
+• Admin berhak memblokir tanpa pemberitahuan
+
+🔹 *Etika Chatting:*
+• Gunakan bahasa santun
+• Tidak boleh meminta data pribadi
+• Tidak boleh menghina/melecehkan
+• Fokus pada percakapan yang sehat
+
+🔹 *Privasi:*
+• Hanya gender yang terlihat
+• Identitas asli tidak pernah dibagikan
+• Percakapan bersifat sementara
+`;
+        bot.editMessageText(fullRules, { 
+            parse_mode: 'Markdown', 
+            chat_id: message.chat.id, 
+            message_id: message.message_id 
+        });
+    }
+});
+
+// Admin Command: /banned
+bot.onText(/\/banned (.+)/, (msg, match) => {
+    // Pastikan hanya admin yang bisa menggunakan perintah ini
+    if (msg.from.id.toString() !== adminId.toString()) {
+        bot.sendMessage(msg.chat.id, '❌ Anda tidak memiliki izin untuk menggunakan perintah ini.');
+        return;
+    }
+
+    const userId = match[1].trim();
+
+    // Cek apakah user ID valid
+    if (!data.users[userId]) {
+        bot.sendMessage(msg.chat.id, `❌ Pengguna dengan ID ${userId} tidak ditemukan.`);
+        return;
+    }
+
+    // Tambahkan ke daftar banned
+    if (!data.banned.includes(userId)) {
+        data.banned.push(userId);
+        saveData();
+
+        // Putuskan koneksi jika sedang dalam chat
+        if (data.users[userId].partner) {
+            const partnerId = data.users[userId].partner;
+            data.users[userId].partner = null;
+            data.users[partnerId].partner = null;
+            bot.sendMessage(partnerId, '❌ Pasangan Anda telah diblokir oleh admin.');
+        }
+
+        bot.sendMessage(msg.chat.id, `✅ Pengguna ${userId} berhasil dibanned.`);
+        
+        // Kirim notifikasi ke pengguna yang dibanned
+        try {
+            bot.sendMessage(userId, '❌ Anda telah diblokir oleh admin. Hubungi tim support untuk informasi lebih lanjut.');
+        } catch (error) {
+            console.log(`Tidak dapat mengirim pesan ke ${userId}`);
+        }
+    } else {
+        bot.sendMessage(msg.chat.id, `⚠️ Pengguna ${userId} sudah ada dalam daftar banned.`);
+    }
+});
+
+// Admin Command: /unban
+bot.onText(/\/unban (.+)/, (msg, match) => {
+    // Pastikan hanya admin yang bisa menggunakan perintah ini
+    if (msg.from.id.toString() !== adminId.toString()) {
+        bot.sendMessage(msg.chat.id, '❌ Anda tidak memiliki izin untuk menggunakan perintah ini.');
+        return;
+    }
+
+    const userId = match[1].trim();
+
+    // Cek apakah user ID ada di daftar banned
+    const bannedIndex = data.banned.indexOf(userId);
+    if (bannedIndex > -1) {
+        // Hapus dari daftar banned
+        data.banned.splice(bannedIndex, 1);
+        saveData();
+
+        bot.sendMessage(msg.chat.id, `✅ Pengguna ${userId} berhasil diunban.`);
+        
+        // Kirim notifikasi ke pengguna yang diunban
+        try {
+            bot.sendMessage(userId, '✅ Anda telah diunban oleh admin. Anda dapat menggunakan bot kembali.');
+        } catch (error) {
+            console.log(`Tidak dapat mengirim pesan ke ${userId}`);
+        }
+    } else {
+        bot.sendMessage(msg.chat.id, `⚠️ Pengguna ${userId} tidak ada dalam daftar banned.`);
+    }
+});
+
+// Tambahkan admin command untuk melihat daftar banned
+bot.onText(/\/bannedlist/, (msg) => {
+    // Pastikan hanya admin yang bisa menggunakan perintah ini
+    if (msg.from.id.toString() !== adminId.toString()) {
+        bot.sendMessage(msg.chat.id, '❌ Anda tidak memiliki izin untuk menggunakan perintah ini.');
+        return;
+    }
+
+    if (data.banned.length === 0) {
+        bot.sendMessage(msg.chat.id, '📋 Tidak ada pengguna yang di-banned.');
+        return;
+    }
+
+    const bannedList = data.banned.map(userId => {
+        const user = data.users[userId];
+        return `👤 ID: ${userId}, Gender: ${user ? user.gender || 'Tidak diatur' : 'Data tidak tersedia'}`;
+    }).join('\n');
+
+    bot.sendMessage(
+        msg.chat.id, 
+        '🚫 *Daftar Pengguna Banned:*\n\n' + bannedList, 
         { parse_mode: 'Markdown' }
     );
 });
