@@ -5,7 +5,7 @@ const path = require('path');
 // Token from BotFather
 const token = '7354627036:AAGwOUhPZz5-bomZcsTw9K_KAZJjzMYRbgk';
 const bot = new TelegramBot(token, { polling: true });
-const adminId = "5988451717"; // Tetap sebagai number
+const adminId = 5988451717; // Tetap sebagai number
 
 // Path file data
 const DATA_FILE = path.join(__dirname, 'data.json');
@@ -644,77 +644,6 @@ bot.onText(/\/stop/, (msg) => {
     }
 });
 
-// /totaluser
-bot.onText(/\/totaluser/, (msg) => {
-    const totalUsers = Object.keys(data.users).length;
-    
-    // Prepare user details for response
-    const userDetails = Object.values(data.users)
-        .map((u) => `👤 *ID:* ${u.id}\n💡 *Gender:* ${u.gender || 'Belum diatur'}\n🔗 *Status:* ${u.partner ? 'Terhubung' : 'Tidak terhubung'}`)
-        .join('\n\n');
-
-    bot.sendMessage(
-        msg.chat.id,
-        `📊 *Total Pengguna:*\n\n` +
-        `📌 Jumlah Pengguna: ${totalUsers} orang\n\n` +
-        `${userDetails}`,
-        { parse_mode: 'Markdown' }
-    );
-});
-
-// /help command
-bot.onText(/\/help/, (msg) => {
-    const helpMessage = `
-*🤖 Anonymous Chat Bot - Panduan Lengkap* 
-
-*👤 Pengaturan Akun :*
-• \`/start\` - Memulai bot dan melihat petunjuk dasar ✅
-• \`/setgender\` - Atur gender Anda (hanya sekali) ‼️
-
-*💬 Fitur Chat :*
-• \`/next\` - Temukan pasangan chat acak dengan gender berbeda ✅
-• \`/stop\` - Akhiri percakapan saat ini ‼️
-   - Akan menawarkan opsi pelaporan setelah mengakhiri chat 💬
-
-*🚨 Pelaporan :*
-• Saat menggunakan \`/stop\`, Anda dapat melaporkan pasangan dengan berbagai alasan:
-   - Kekerasan ⚠️
-   - Pornografi 🔞
-   - Pemerasan 💰
-   - Scamming ❌
-   - Alasan Lainnya 💬
-
-*ℹ️ Informasi :*
-• \`/totaluser\` - Lihat statistik total pengguna [ admin only ] ✅
-• 👀 Fitur rahasia : Chat Anda dijamin anonim! 🤩
-
-*⚠️ Peraturan Penting :*
-1. Hormati pasangan chat Anda ❕
-2. Dilarang mengirim konten tidak pantas 🔞
-3. Satu kali pengaturan gender ✅
-4. Admin dapat memblokir pengguna yang melanggar ‼️
-
-*🔒 Privasi :*
-• Tidak ada identitas pribadi yang tersimpan ✅
-• Chat dijamin anonim 👁‍🗨
-• Hanya gender yang diketahui✅
-
-*🆘 Bantuan Tambahan :*
-• 👀 Jika mengalami masalah, hubungi admin 🤩
-• 🚫 Pelanggaran dapat berakibat banned ✅
-`;
-
-    bot.sendMessage(msg.chat.id, helpMessage, { 
-        parse_mode: 'Markdown',
-        reply_markup: {
-            inline_keyboard: [
-                [{ text: '❓ Panduan Singkat', callback_data: 'quick_help' }],
-                [{ text: '⚖️ Peraturan Lengkap', callback_data: 'full_rules' }]
-            ]
-        }
-    });
-});
-
 // Admin Command: /banned
 bot.onText(/\/banned (.+)/, (msg, match) => {
     // Pastikan hanya admin yang bisa menggunakan perintah ini
@@ -866,6 +795,77 @@ bot.onText(/\/broadcast/, async (msg) => {
             message_id: progressMsg.message_id 
         }
     );
+});
+
+// /totaluser
+bot.onText(/\/totaluser/, (msg) => {
+    const totalUsers = Object.keys(data.users).length;
+    
+    // Prepare user details for response
+    const userDetails = Object.values(data.users)
+        .map((u) => `👤 *ID:* ${u.id}\n💡 *Gender:* ${u.gender || 'Belum diatur'}\n🔗 *Status:* ${u.partner ? 'Terhubung' : 'Tidak terhubung'}`)
+        .join('\n\n');
+
+    bot.sendMessage(
+        msg.chat.id,
+        `📊 *Total Pengguna:*\n\n` +
+        `📌 Jumlah Pengguna: ${totalUsers} orang\n\n` +
+        `${userDetails}`,
+        { parse_mode: 'Markdown' }
+    );
+});
+
+// /help command
+bot.onText(/\/help/, (msg) => {
+    const helpMessage = `
+*🤖 Anonymous Chat Bot - Panduan Lengkap* 
+
+*👤 Pengaturan Akun :*
+• \`/start\` - Memulai bot dan melihat petunjuk dasar ✅
+• \`/setgender\` - Atur gender Anda (hanya sekali) ‼️
+
+*💬 Fitur Chat :*
+• \`/next\` - Temukan pasangan chat acak dengan gender berbeda ✅
+• \`/stop\` - Akhiri percakapan saat ini ‼️
+   - Akan menawarkan opsi pelaporan setelah mengakhiri chat 💬
+
+*🚨 Pelaporan :*
+• Saat menggunakan \`/stop\`, Anda dapat melaporkan pasangan dengan berbagai alasan:
+   - Kekerasan ⚠️
+   - Pornografi 🔞
+   - Pemerasan 💰
+   - Scamming ❌
+   - Alasan Lainnya 💬
+
+*ℹ️ Informasi :*
+• ✅ \`/userlist\` - Lihat statistik total pengguna [ admin only ] ✅
+• 👀 Fitur rahasia : Chat Anda dijamin anonim! 🤩
+
+*⚠️ Peraturan Penting :*
+1. Hormati pasangan chat Anda ❕
+2. Dilarang mengirim konten tidak pantas 🔞
+3. Satu kali pengaturan gender ✅
+4. Admin dapat memblokir pengguna yang melanggar ‼️
+
+*🔒 Privasi :*
+• Tidak ada identitas pribadi yang tersimpan ✅
+• Chat dijamin anonim 👁‍🗨
+• Hanya gender yang diketahui✅
+
+*🆘 Bantuan Tambahan :*
+• 👀 Jika mengalami masalah, hubungi admin 🤩
+• 🚫 Pelanggaran dapat berakibat banned ✅
+`;
+
+    bot.sendMessage(msg.chat.id, helpMessage, { 
+        parse_mode: 'Markdown',
+        reply_markup: {
+            inline_keyboard: [
+                [{ text: '❓ Panduan Singkat', callback_data: 'quick_help' }],
+                [{ text: '⚖️ Peraturan Lengkap', callback_data: 'full_rules' }]
+            ]
+        }
+    });
 });
 
 //cek
