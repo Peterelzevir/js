@@ -58,55 +58,6 @@ async function findPartner(userId) {
     return availableUsers.length > 0 ? availableUsers[0].id : null;
 }
 
-// Handler utama pesan
-bot.on('message', async (msg) => {
-    // Abaikan pesan sistem atau tanpa pengirim
-    if (!msg || !msg.from) return;
-
-    const userId = msg.from.id.toString();
-
-    // Pastikan objek users ada
-    if (!data.users) {
-        data.users = {};
-    }
-
-    // Inisialisasi pengguna jika belum ada
-    if (!data.users[userId]) {
-        data.users[userId] = { 
-            id: userId, 
-            gender: null, 
-            partner: null 
-        };
-        saveData();
-    }
-
-    const user = data.users[userId];
-
-    //abaikan
-    if (msg.text && msg.text.startsWith('/')) {
-    console.log(`Command ${msg.text} diterima dari user ${userId}. Tidak diteruskan ke pasangan.`);
-    return;
-}
-
-    // Proses perintah /start
-    if (msg.text === '/start') {
-        bot.sendMessage(
-            msg.chat.id,
-            `👋 *Selamat datang di Anonymous Chat @anontelerobot! ✅*\n\n` +
-            `👀 Gunakan perintah berikut untuk memulai:\n` +
-            `👉 \`/next\` - Cari pasangan lain 👀\n` +
-            `👉 \`/stop\` - Akhiri chat 🙏🏻\n` +
-            `👉 \`/setgender\` - Atur gender 😎\n` +
-            `👉 \`/help\` - Bantuan 👀`,
-            { parse_mode: 'Markdown' }
-        );
-        return;
-    }
-
-    // Cek blokir
-    if (data.banned && data.banned.includes(userId)) {
-        bot.sendMessage(msg.chat.id, '❌ Anda telah di-*banned* oleh admin', { parse_mode: 'Markdown' });
-        return;
 bot.on('message', async (msg) => {
     if (!msg || !msg.from) return; // Abaikan pesan sistem atau tanpa pengirim
 
@@ -194,7 +145,7 @@ bot.on('message', async (msg) => {
             }
         } catch (error) {
             console.error('Gagal mengirim pesan ke pasangan:', error);
-            bot.sendMessage(userId, '❌ gagal mengirim pesan, mungkin pasangan telah keluar.');
+            bot.sendMessage(userId, '❌ Gagal mengirim pesan, mungkin pasangan telah keluar.');
         }
     }
 });
