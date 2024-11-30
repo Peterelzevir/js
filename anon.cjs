@@ -6,30 +6,19 @@ const token = '7354627036:AAGwOUhPZz5-bomZcsTw9K_KAZJjzMYRbgk';
 const bot = new TelegramBot(token, { polling: true });
 const adminId = '5988451717'; // Admin ID
 
-let data;
+let data = { users: {}, banned: [] }; // Default initialization
 
-// Function to initialize data from 'data.json'
-function initializeData() {
-    try {
-        const rawData = fs.readFileSync('data.json', 'utf8');
-        data = rawData ? JSON.parse(rawData) : { users: {}, banned: [] };
-    } catch (error) {
-        console.error("Error reading or parsing data.json:", error);
-        data = { users: {}, banned: [] }; // Initialize with default structure on error
-    }
+// Try reading the data from 'data.json'
+try {
+    const rawData = fs.readFileSync('data.json', 'utf8');
+    data = rawData ? JSON.parse(rawData) : data;
+} catch (error) {
+    console.error("Error reading or parsing data.json:", error);
 }
-
-// Function to save data to 'data.json'
-function saveData() {
-    fs.writeFileSync('data.json', JSON.stringify(data, null, 2));
-}
-
-// Initialize data on startup
-initializeData();
 
 // Middleware to check banned users
 bot.on('message', (msg) => {
-    if (data.banned.includes(msg.from.id)) {
+    if (data && data.banned && Array.isArray(data.banned) && data.banned.includes(msg.from.id)) {
         bot.sendMessage(msg.chat.id, '❌ Anda telah di-*banned* oleh admin\n\n👀 chat admin now!');
         return;
     }
