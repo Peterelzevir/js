@@ -9,6 +9,7 @@ const adminId = 5988451717; // Tetap sebagai number
 
 // Path file data
 const DATA_FILE = path.join(__dirname, 'data.json');
+const userReportState = {};
 
 // Fungsi untuk membaca data
 function readData() {
