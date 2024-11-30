@@ -82,6 +82,12 @@ bot.on('message', async (msg) => {
 
     const user = data.users[userId];
 
+    //abaikan
+    if (msg.text && msg.text.startsWith('/')) {
+    console.log(`Command ${msg.text} diterima dari user ${userId}. Tidak diteruskan ke pasangan.`);
+    return;
+}
+
     // Proses perintah /start
     if (msg.text === '/start') {
         bot.sendMessage(
