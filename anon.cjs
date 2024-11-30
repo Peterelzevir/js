@@ -5,7 +5,7 @@ const path = require('path');
 // Token from BotFather
 const token = '7354627036:AAGwOUhPZz5-bomZcsTw9K_KAZJjzMYRbgk';
 const bot = new TelegramBot(token, { polling: true });
-const adminId = 5988451717; // Tetap sebagai number
+const adminId = "5988451717"; // Tetap sebagai number
 
 // Path file data
 const DATA_FILE = path.join(__dirname, 'data.json');
