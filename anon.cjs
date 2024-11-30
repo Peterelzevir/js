@@ -312,13 +312,13 @@ bot.onText(/\/next/, async (msg) => {
     }
 
     if (user.partner) {
-        bot.sendMessage(msg.chat.id, '⚠️ Anda sudah terhubung, gunakan `/stop` untuk mengakhiri.');
+        bot.sendMessage(msg.chat.id, '⚠️ Yey! kamu sudah terhubung\n\n👀 gunakan `/stop` untuk mengakhiri chat 👌');
         return;
     }
 
     // Cek apakah sudah dalam antrean pencarian
     if (searchingQueue.includes(userId)) {
-        bot.sendMessage(msg.chat.id, '⚠️ Anda sudah dalam antrean pencarian.');
+        bot.sendMessage(msg.chat.id, '⚠️ Anda sudah dalam antrean pencarian, mohon tunggu 👀');
         return;
     }
 
@@ -350,7 +350,7 @@ bot.onText(/\/next/, async (msg) => {
 
             if (stillSearching && !data.users[userId].partner) {
                 await bot.deleteMessage(msg.chat.id, searchMsg.message_id);
-                bot.sendMessage(msg.chat.id, '❌ Tidak ada pasangan yang tersedia. Pencarian dihentikan.');
+                bot.sendMessage(msg.chat.id, '❌ Tidak ada pasangan yang tersedia, Pencarian dihentikan 😔\n\n💬 /next untuk mencari kembali ✅');
                 removeFromQueue(userId); // Hapus dari antrean
             }
         }, 5 * 60 * 1000); // 5 menit
@@ -399,8 +399,8 @@ bot.onText(/\/stop/, (msg) => {
         
         saveData();
 
-        bot.sendMessage(msg.chat.id, '❌ Chat dihentikan.');
-        bot.sendMessage(partnerId, '❌ Pasangan Anda menghentikan chat.');
+        bot.sendMessage(msg.chat.id, '❌ Chat berhasil dihentikan ✅\n\n👀 /next untuk mencari lagi 💬');
+        bot.sendMessage(partnerId, '❌ yahh, dia sudah menghentikan chat dengan kamu 😔\n\n👀 /next untuk mencari lagi 💬');
 
         // Display report options
         bot.sendMessage(
