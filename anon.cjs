@@ -247,7 +247,7 @@ bot.on('callback_query', async (callbackQuery) => {
             break;
         }
 
-// Report Handling
+        // Report Handling
 case callbackData.startsWith('report_'): {
     const [, reportedId, reason] = callbackData.split('_');
     const reporterId = callbackQuery.from.id.toString();
@@ -298,7 +298,7 @@ case callbackData.startsWith('report_'): {
         data.reports[reporterId].push(reportedId);
 
         // Kirim laporan ke admin
-        await bot.sendMessage(
+        const reportMessage = await bot.sendMessage(
             adminId,
             `📣 *Laporan Pengguna Baru*\n\n` +
             `👤 Pelapor: \`${reporterId}\`\n` +
@@ -317,6 +317,9 @@ case callbackData.startsWith('report_'): {
                 }
             }
         );
+
+        // Simpan ID pesan laporan agar bisa dihapus nanti
+        reportMessages[reportedId] = reportMessage.message_id;
 
         // Konfirmasi ke pengguna
         await bot.answerCallbackQuery(callbackQuery.id, { 
@@ -340,6 +343,40 @@ case callbackData.startsWith('report_'): {
     }
     break;
 }
+
+bot.on('callback_query', async (callbackQuery) => {
+    const data = callbackQuery.data;
+
+    if (data.startsWith('admin_ban_')) {
+        const userId = data.split('_')[2];
+
+        // Logika untuk menambah pengguna ke dalam daftar banned
+        if (!data.banned) data.banned = [];
+        data.banned.push(userId);
+
+        // Simpan perubahan data (misalnya data bans)
+        saveData();
+
+        // Hapus laporan yang ada
+        if (reportMessages[userId]) {
+            await bot.deleteMessage(callbackQuery.message.chat.id, reportMessages[userId]);
+            delete reportMessages[userId]; // Hapus dari penyimpanan
+        }
+
+        await bot.answerCallbackQuery(callbackQuery.id, { text: '🚫 Pengguna berhasil diblokir' });
+    }
+
+    if (data === 'admin_ignore_report') {
+        // Hapus laporan jika admin memilih abaikan
+        const reportedId = callbackQuery.message.text.match(/Dilaporkan: `(\d+)`/)[1];
+        if (reportMessages[reportedId]) {
+            await bot.deleteMessage(callbackQuery.message.chat.id, reportMessages[reportedId]);
+            delete reportMessages[reportedId]; // Hapus dari penyimpanan
+        }
+
+        await bot.answerCallbackQuery(callbackQuery.id, { text: '✅ Laporan diabaikan' });
+    }
+});
         // Quick Help
         case callbackData === 'quick_help': {
             const quickHelp = `
@@ -511,24 +548,6 @@ function removeFromQueue(userId) {
     const index = searchingQueue.indexOf(userId);
     if (index !== -1) searchingQueue.splice(index, 1);
 }
-
-bot.on('callback_query', async (callbackQuery) => {
-    const data = callbackQuery.data;
-
-    if (data.startsWith('admin_ban_')) {
-        const userId = data.split('_')[2];
-        // Logika blokir pengguna
-        if (!data.banned) data.banned = [];
-        data.banned.push(userId);
-        saveData();
-
-        await bot.answerCallbackQuery(callbackQuery.id, { text: '🚫 Pengguna berhasil diblokir' });
-    }
-
-    if (data === 'admin_ignore_report') {
-        await bot.answerCallbackQuery(callbackQuery.id, { text: '✅ Laporan diabaikan' });
-    }
-});
 
 // /stop (Hentikan Chat)
 bot.onText(/\/stop/, (msg) => {
