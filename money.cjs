@@ -22,7 +22,7 @@ bot.onText(/\/start/, (msg) => {
 
     bot.sendMessage(
         chatId,
-        "👋 Selamat datang cantik di bot @cantikmoneybot\n\n🔔 setiap foto/video/audio 18+ yang kamu kirim akan di berikan saldo 🤩\n👀 full body + face untuk video/foto bagus dihargai lebih tinggi!\n👁‍🗨 vn desah terbaik akan dibayar lumayan!😘\n✅ notes : foto/video/audio kamu 100% privasi dijaga!\n\n🤩 silakan pilih jenis yg kamu kirim cantik ❤",
+        "👋 Selamat datang cantik di bot @cantikmoneybot\n\n1.🔔 setiap foto/video/audio 18+ yang kamu kirim akan di berikan saldo 🤩\n\n2.👀 full body + face untuk video/foto bagus dihargai lebih tinggi!\n\n3.👁‍🗨 vn desah terbaik akan dibayar lumayan!😘\n\n\n✅ notes : foto/video/audio kamu 100% privasi dijaga!\n\n🤩 silakan pilih jenis yg kamu kirim cantik ❤",
         {
             reply_markup: {
                 inline_keyboard: [
