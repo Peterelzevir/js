@@ -12,7 +12,7 @@ from telethon.tl.types import PeerChannel
 # Konfigurasi API Telegram Anda
 API_ID = '23207350'  # Ganti dengan API ID Anda
 API_HASH = '03464b6c80a5051eead6835928e48189'  # Ganti dengan API Hash Anda
-SESSION_NAME = 'sessi'
+SESSION_NAME = 'sessi jr'
 
 # Membuat objek client
 client = TelegramClient(SESSION_NAME, API_ID, API_HASH)
