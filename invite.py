@@ -9,6 +9,7 @@ from telethon.errors import (
     PeerIdInvalidError,
 )
 from telethon.tl.types import PeerChannel
+from telethon.tl.types import ChannelParticipantsSearch
 
 # Konfigurasi API Telegram Anda
 API_ID = '23207350'  # Ganti dengan API ID Anda
