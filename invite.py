@@ -149,20 +149,9 @@ async def get_user_info(event):
     except Exception as e:
         await event.reply(f"❌ Gagal mendapatkan info pengguna `{target}`: {str(e)}")
 
-@client.on(events.NewMessage(pattern='/id'))
-async def get_group_id(event):
-    if not is_admin(event.sender_id):
-        await event.reply("❌ Anda tidak memiliki izin untuk menggunakan fitur ini.")
-        return
-
-    chat = await event.get_chat()  # Ambil informasi chat tempat perintah dikirim
-    if chat.participants_count is None:
-        await event.reply("⚠️ Perintah ini hanya dapat digunakan di grup atau saluran.")
-        return
-
-    await event.reply(f"📋 ID grup ini adalah: `{chat.id}`")
 @client.on(events.NewMessage(pattern='/ad (.+)'))
 async def add_members(event):
+    # Memastikan pengirim adalah admin
     if not is_admin(event.sender_id):
         await event.reply("❌ Anda tidak memiliki izin untuk menggunakan fitur ini.")
         return
@@ -177,12 +166,12 @@ async def add_members(event):
         target_group_id = int(target_group_id.strip())
         limit = int(limit.strip())
 
-        source_chat = await event.get_chat()
-        if not isinstance(source_chat, PeerChannel):
-            await event.reply("⚠️ Perintah ini hanya dapat digunakan di grup.")
+        source_chat = await event.get_chat()  # Mendapatkan chat sumber
+        if source_chat.broadcast:
+            await event.reply("⚠️ Perintah ini hanya dapat digunakan di grup biasa.")
             return
 
-        await event.delete()  # Hapus pesan perintah
+        await event.delete()  # Menghapus pesan perintah
 
         participants = await client(GetParticipantsRequest(
             source_chat.id, ChannelParticipantsSearch(''), offset=0, limit=limit, hash=0
@@ -225,6 +214,22 @@ async def add_members(event):
         await event.reply("❗ Gunakan perintah dengan benar: /ad <id grup tujuan> <jumlah>")
     except Exception as e:
         await event.reply(f"❌ Terjadi kesalahan: {str(e)}")
+
+@client.on(events.NewMessage(pattern='/id'))
+async def get_group_id(event):
+    # Memastikan pengirim adalah admin
+    if not is_admin(event.sender_id):
+        await event.reply("❌ Anda tidak memiliki izin untuk menggunakan fitur ini.")
+        return
+
+    # Mendapatkan informasi chat tempat perintah dikirim
+    chat = await event.get_chat()  
+
+    # Memastikan chat adalah grup
+    if not chat.broadcast:  # chat.broadcast akan False untuk grup biasa
+        await event.reply(f"📋 ID grup ini adalah: `{chat.id}`")
+    else:
+        await event.reply("⚠️ Perintah ini hanya dapat digunakan di grup biasa.")
 
 # Menjalankan client
 client.start()
