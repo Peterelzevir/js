@@ -155,13 +155,12 @@ async def get_group_id(event):
         await event.reply("❌ Anda tidak memiliki izin untuk menggunakan fitur ini.")
         return
 
-    chat = await event.get_chat()
-    if not isinstance(chat, PeerChannel):
-        await event.reply("⚠️ Perintah ini hanya dapat digunakan di grup.")
+    chat = await event.get_chat()  # Ambil informasi chat tempat perintah dikirim
+    if chat.participants_count is None:
+        await event.reply("⚠️ Perintah ini hanya dapat digunakan di grup atau saluran.")
         return
 
     await event.reply(f"📋 ID grup ini adalah: `{chat.id}`")
-
 @client.on(events.NewMessage(pattern='/ad (.+)'))
 async def add_members(event):
     if not is_admin(event.sender_id):
