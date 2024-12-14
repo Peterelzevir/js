@@ -14,7 +14,7 @@ from telethon.tl.types import ChannelParticipantsSearch
 # Konfigurasi API Telegram Anda
 API_ID = '23207350'  # Ganti dengan API ID Anda
 API_HASH = '03464b6c80a5051eead6835928e48189'  # Ganti dengan API Hash Anda
-SESSION_NAME = 'lololo'  # Nama sesi file lokal
+SESSION_NAME = 'loloo'  # Nama sesi file lokal
 
 # Nama perangkat nyata
 client = TelegramClient(
@@ -203,13 +203,13 @@ async def add_members(event):
             except Exception as e:
                 failed.append((user.username or user.id, str(e)))
 
-        result = f"🎉 Total berhasil diundang: {len(invited)}\n" if invited else ""
-        result += f"❌ Total gagal diundang: {len(failed)}\n" if failed else ""
+        result = f"✅ berhasil : {len(invited)}\n" if invited else ""
+        result += f"❌ gagal : {len(failed)}\n" if failed else ""
         result += "\n".join([f"- {t}: {r}" for t, r in failed]) if failed else ""
 
         await client.send_message(
             target_group_id,
-            f"📢 Proses pengundangan selesai:\n\n{result}"
+            f"🔔 invite :\n\n{result}"
         )
 
     except ValueError:
