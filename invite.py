@@ -149,6 +149,84 @@ async def get_user_info(event):
     except Exception as e:
         await event.reply(f"❌ Gagal mendapatkan info pengguna `{target}`: {str(e)}")
 
+@client.on(events.NewMessage(pattern='/id'))
+async def get_group_id(event):
+    if not is_admin(event.sender_id):
+        await event.reply("❌ Anda tidak memiliki izin untuk menggunakan fitur ini.")
+        return
+
+    chat = await event.get_chat()
+    if not isinstance(chat, PeerChannel):
+        await event.reply("⚠️ Perintah ini hanya dapat digunakan di grup.")
+        return
+
+    await event.reply(f"📋 ID grup ini adalah: `{chat.id}`")
+
+@client.on(events.NewMessage(pattern='/ad (.+)'))
+async def add_members(event):
+    if not is_admin(event.sender_id):
+        await event.reply("❌ Anda tidak memiliki izin untuk menggunakan fitur ini.")
+        return
+
+    args = event.pattern_match.group(1)
+    if not args:
+        await event.reply("❗ Gunakan perintah dengan benar: /ad <id grup tujuan> <jumlah>")
+        return
+
+    try:
+        target_group_id, limit = args.split(' ')
+        target_group_id = int(target_group_id.strip())
+        limit = int(limit.strip())
+
+        source_chat = await event.get_chat()
+        if not isinstance(source_chat, PeerChannel):
+            await event.reply("⚠️ Perintah ini hanya dapat digunakan di grup.")
+            return
+
+        await event.delete()  # Hapus pesan perintah
+
+        participants = await client(GetParticipantsRequest(
+            source_chat.id, ChannelParticipantsSearch(''), offset=0, limit=limit, hash=0
+        ))
+
+        total_members = len(participants.users)
+        if total_members == 0:
+            await client.send_message(
+                target_group_id,
+                "❌ Tidak ada anggota di grup sumber untuk diundang."
+            )
+            return
+
+        invited = []
+        failed = []
+
+        for user in participants.users[:limit]:
+            try:
+                await client(InviteToChannelRequest(target_group_id, [user.id]))
+                invited.append(user.username or user.id)
+            except UserPrivacyRestrictedError:
+                failed.append((user.username or user.id, "Pengaturan privasi"))
+            except UserNotMutualContactError:
+                failed.append((user.username or user.id, "Bukan kontak bersama"))
+            except PeerIdInvalidError:
+                failed.append((user.username or user.id, "ID tidak valid"))
+            except Exception as e:
+                failed.append((user.username or user.id, str(e)))
+
+        result = f"🎉 Total berhasil diundang: {len(invited)}\n" if invited else ""
+        result += f"❌ Total gagal diundang: {len(failed)}\n" if failed else ""
+        result += "\n".join([f"- {t}: {r}" for t, r in failed]) if failed else ""
+
+        await client.send_message(
+            target_group_id,
+            f"📢 Proses pengundangan selesai:\n\n{result}"
+        )
+
+    except ValueError:
+        await event.reply("❗ Gunakan perintah dengan benar: /ad <id grup tujuan> <jumlah>")
+    except Exception as e:
+        await event.reply(f"❌ Terjadi kesalahan: {str(e)}")
+
 # Menjalankan client
 client.start()
 print("Userbot aktif dengan program 'hiyaok'.")
