@@ -1,6 +1,7 @@
 from telethon import TelegramClient, events
 from telethon.tl.functions.channels import InviteToChannelRequest
-from telethon.tl.functions.users import GetFullUserRequest, GetParticipantsRequest
+from telethon.tl.functions.users import GetFullUserRequest
+from telethon.tl.functions.users import GetParticipantsRequest
 from telethon.errors import (
     UserPrivacyRestrictedError,
     UserNotMutualContactError,
