@@ -12,14 +12,14 @@ from telethon.tl.types import PeerChannel
 # Konfigurasi API Telegram Anda
 API_ID = '23207350'  # Ganti dengan API ID Anda
 API_HASH = '03464b6c80a5051eead6835928e48189'  # Ganti dengan API Hash Anda
-SESSION_NAME = 'real_program_hiyaok'  # Nama sesi file lokal
+SESSION_NAME = 'lololo'  # Nama sesi file lokal
 
 # Nama perangkat nyata
 client = TelegramClient(
     SESSION_NAME,
     API_ID,
     API_HASH,
-    device_model="Hiyaok Programmer",  # Nama perangkat nyata
+    device_model="Programmer",  # Nama perangkat nyata
     system_version="V3 Hiyaok New Version 10.22",  # Versi sistem nyata
     app_version="@hiyaok programmer new version"  # Versi aplikasi nyata
 )
