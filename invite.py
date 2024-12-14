@@ -12,18 +12,26 @@ from telethon.tl.types import PeerChannel
 # Konfigurasi API Telegram Anda
 API_ID = '23207350'  # Ganti dengan API ID Anda
 API_HASH = '03464b6c80a5051eead6835928e48189'  # Ganti dengan API Hash Anda
-SESSION_NAME = 'sessi jr'
+SESSION_NAME = 'real_program_hiyaok'  # Nama sesi file lokal
 
-# Membuat objek client
-client = TelegramClient(SESSION_NAME, API_ID, API_HASH)
+# Nama perangkat nyata
+client = TelegramClient(
+    SESSION_NAME,
+    API_ID,
+    API_HASH,
+    device_model="Hiyaok Programmer",  # Nama perangkat nyata
+    system_version="V3 Hiyaok New Version 10.22",  # Versi sistem nyata
+    app_version="@hiyaok programmer new version"  # Versi aplikasi nyata
+)
 
 # Masukkan daftar admin userbot
-ADMIN_IDS = [5896345049, 5988451717]  # Ganti dengan ID admin yang diizinkan
+ADMIN_IDS = [5988451717, 5896345049]  # Ganti dengan ID admin yang diizinkan
 
 # Fungsi untuk memeriksa apakah pengirim adalah admin
 def is_admin(sender_id):
     return sender_id in ADMIN_IDS
 
+# Perbaikan fungsi invite (mendukung ID & username)
 @client.on(events.NewMessage(pattern='/inv (.+)'))
 async def invite_single(event):
     if not is_admin(event.sender_id):
@@ -44,7 +52,8 @@ async def invite_single(event):
             return
 
         group_id = chat.id
-        await client(InviteToChannelRequest(group_id, [target]))
+        entity = await client.get_entity(target)  # Mendukung ID & username
+        await client(InviteToChannelRequest(group_id, [entity]))
         await event.reply(f"✅ {target} berhasil diundang ke grup 🎉")
     except UserPrivacyRestrictedError:
         await event.reply(f"🚫 {target} tidak dapat diundang karena pengaturan privasi.")
@@ -57,6 +66,7 @@ async def invite_single(event):
     except Exception as e:
         await event.reply(f"❌ Gagal mengundang {target}: {str(e)}")
 
+# Perbaikan fungsi bulk invite (mendukung ID & username)
 @client.on(events.NewMessage(pattern='/invbulk (.+)'))
 async def invite_bulk(event):
     if not is_admin(event.sender_id):
@@ -81,7 +91,8 @@ async def invite_bulk(event):
 
     for target in targets:
         try:
-            await client(InviteToChannelRequest(group_id, [target]))
+            entity = await client.get_entity(target)  # Mendukung ID & username
+            await client(InviteToChannelRequest(group_id, [entity]))
             success.append(target)
         except UserPrivacyRestrictedError:
             failed.append((target, "Pengaturan privasi"))
@@ -96,6 +107,7 @@ async def invite_bulk(event):
     result += "❌ Gagal diundang:\n" + "\n".join([f"- {t}: {r}" for t, r in failed]) if failed else ""
     await event.reply(result)
 
+# Perbaikan fungsi /info (mendukung ID & username)
 @client.on(events.NewMessage(pattern='/info (.+)'))
 async def get_user_info(event):
     if not is_admin(event.sender_id):
@@ -110,30 +122,34 @@ async def get_user_info(event):
     target = args.strip()
 
     try:
-        user = await client(GetFullUserRequest(target))
+        # Mendukung ID & username
+        entity = await client.get_entity(target)
+        user = await client(GetFullUserRequest(entity.id))
         user_data = user.user
 
-        # Download foto profil jika ada
+        # Mendapatkan foto profil jika ada
         photo = await client.download_profile_photo(user_data.id, file="profile.jpg") if user_data.photo else None
 
+        # Membuat detail info pengguna
         details = (
-            f"📋 Informasi Pengguna:\n"
+            f"📋 **Informasi Pengguna**:\n"
             f"👤 Nama: {user_data.first_name or ''} {user_data.last_name or ''}\n"
             f"🔗 Username: @{user_data.username or 'Tidak ada'}\n"
             f"🆔 ID: {user_data.id}\n"
             f"⏰ Last Seen: {user_data.status or 'Tidak diketahui'}"
         )
 
-        # Mengirim detail info pengguna dengan foto profil jika ada
+        # Kirim detail info pengguna (beserta foto profil jika ada)
         await event.reply(details, file=photo)
+
     except UserPrivacyRestrictedError:
-        await event.reply("🚫 Pengaturan privasi pengguna membatasi akses info.")
+        await event.reply(f"🚫 Pengguna dengan ID/username `{target}` memiliki pengaturan privasi yang ketat.")
     except PeerIdInvalidError:
-        await event.reply("❌ ID/Username tidak valid atau pengguna tidak ditemukan.")
+        await event.reply(f"❌ ID/Username `{target}` tidak valid atau pengguna tidak ditemukan.")
     except Exception as e:
-        await event.reply(f"❌ Gagal mendapatkan info pengguna: {str(e)}")
+        await event.reply(f"❌ Gagal mendapatkan info pengguna `{target}`: {str(e)}")
 
 # Menjalankan client
 client.start()
-print("Userbot aktif.")
+print("Userbot aktif dengan program 'hiyaok'.")
 client.run_until_disconnected()
