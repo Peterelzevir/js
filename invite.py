@@ -21,7 +21,6 @@ from telethon.errors import (
 )
 
 # Konfigurasi Logging
-# Konfigurasi Logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -29,83 +28,29 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Konfigurasi Keamanan dan Konfigurasi
-CONFIG_FILE = 'config.json'
-DEFAULT_CONFIG = {
-    'api_id': '23207350',
-    'api_hash': '03464b6c80a5051eead6835928e48189',
-    'session_name': 'loloo',
-    'admin_ids': [5988451717, 5896345049],
-    'proxy_list': [],
-    'rate_limit': {
-        'invite_cooldown': 3,
-        'max_invites_per_hour': 100
-    }
-}
+# Konfigurasi API Telegram
+API_ID = '23207350'
+API_HASH = '03464b6c80a5051eead6835928e48189'
+SESSION_NAME = 'loloo'
 
-def load_config():
-    try:
-        with open(CONFIG_FILE, 'r') as f:
-            return json.load(f)
-    except FileNotFoundError:
-        with open(CONFIG_FILE, 'w') as f:
-            json.dump(DEFAULT_CONFIG, f, indent=4)
-        return DEFAULT_CONFIG
+# Nama perangkat nyata
+client = TelegramClient(
+    SESSION_NAME,
+    API_ID,
+    API_HASH,
+    device_model="Programmer",
+    system_version="V3 Hiyaok New Version 10.22",
+    app_version="@hiyaok programmer new version"
+)
 
-# Muat Konfigurasi
-CONFIG = load_config()
+# Masukkan daftar admin userbot
+ADMIN_IDS = [5988451717, 5896345049]
 
-# Fungsi Tambahan: Cek IP Publik dan Proxy
-def get_public_ip():
-    try:
-        return urllib.request.urlopen('https://api.ipify.org').read().decode('utf8')
-    except Exception as e:
-        logger.error(f"Gagal mendapatkan IP publik: {e}")
-        return "IP tidak dapat dideteksi"
-
-def check_proxy_status(proxy_list):
-    active_proxies = []
-    for proxy in proxy_list:
-        try:
-            # Implementasi pengecekan proxy
-            # Contoh sederhana, perlu disesuaikan dengan kebutuhan
-            urllib.request.urlopen(f'http://{proxy}', timeout=5)
-            active_proxies.append(proxy)
-        except Exception as e:
-            logger.warning(f"Proxy {proxy} tidak aktif: {e}")
-    return active_proxies
-
-# Inisialisasi Client dengan Proxy Opsional
-def create_client(config):
-    proxy = None
-    active_proxies = check_proxy_status(config['proxy_list'])
-    
-    if active_proxies:
-        proxy_url = active_proxies[0]
-        proxy = {
-            'hostname': proxy_url.split(':')[0],
-            'port': int(proxy_url.split(':')[1])
-        }
-        logger.info(f"Menggunakan proxy: {proxy_url}")
-
-    client = TelegramClient(
-        config['session_name'], 
-        config['api_id'], 
-        config['api_hash'],
-        proxy=proxy,
-        device_model="Programmer V3",
-        system_version="Hiyaok New Version 10.22",
-        app_version="@hiyaok advanced userbot"
-    )
-    return client
-
-# Inisialisasi Client
-client = create_client(CONFIG)
-
+# Fungsi untuk memeriksa apakah pengirim adalah admin
 def is_admin(sender_id):
-    return sender_id in CONFIG['admin_ids']
+    return sender_id in ADMIN_IDS
 
-# Decorator untuk logging dan monitoring
+# Decorator untuk logging perintah
 def log_command(func):
     async def wrapper(event):
         sender = await event.get_sender()
@@ -331,7 +276,7 @@ async def get_group_id(event):
     else:
         await event.reply("⚠️ Perintah ini hanya dapat digunakan di grup biasa.")
 
-# Fitur Monitoring Tambahan
+# Fitur Status Bot
 @client.on(events.NewMessage(pattern='/status'))
 @log_command
 async def bot_status(event):
@@ -339,18 +284,17 @@ async def bot_status(event):
         return await event.reply("❌ Anda tidak memiliki izin.")
 
     status_info = f"""
-🤖 Status Userbot:
-📡 IP Publik: {get_public_ip()}
+🤖 Status Userbot Hiyaok:
+👥 Admin Terdaftar: {len(ADMIN_IDS)}
 ⏰ Waktu Aktif: {datetime.now()}
-👥 Admin Terdaftar: {len(CONFIG['admin_ids'])}
-🔌 Proxy Aktif: {len(check_proxy_status(CONFIG['proxy_list']))}
+📡 Versi: V3 Hiyaok New Version 10.22
     """
     await event.reply(status_info)
 
-# Jalankan Client
+# Menjalankan client
 def main():
     print("🚀 Userbot 'Hiyaok Advanced' sedang diinisialisasi...")
-    logger.info("Memulai userbot dengan konfigurasi advanced")
+    logger.info("Memulai userbot dengan konfigurasi lengkap")
     client.start()
     client.run_until_disconnected()
 
