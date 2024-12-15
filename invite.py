@@ -50,6 +50,12 @@ ADMIN_IDS = [5988451717, 5896345049]
 def is_admin(sender_id):
     return sender_id in ADMIN_IDS
 
+#info
+async def send_to_admins(message):
+    for admin_id in ADMIN_IDS:
+        await client.send_message(admin_id, message)
+
+
 # Decorator untuk logging perintah
 def log_command(func):
     async def wrapper(event):
