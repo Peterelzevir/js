@@ -94,49 +94,6 @@ async def invite_single(event):
     except Exception as e:
         await event.reply(f"❌ Gagal mengundang {target}: {str(e)}")
 
-# Fungsi Invite Bulk (mendukung ID & username)
-@client.on(events.NewMessage(pattern='/invbulk (.+)'))
-@log_command
-async def invite_bulk(event):
-    if not is_admin(event.sender_id):
-        await event.reply("❌ Anda tidak memiliki izin untuk menggunakan fitur ini.")
-        return
-
-    args = event.pattern_match.group(1)
-    if not args:
-        await event.reply("❗ Gunakan perintah dengan benar: /invbulk [id1/username1],[id2/username2]")
-        return
-
-    targets = [t.strip() for t in args.split(',')]
-    success = []
-    failed = []
-
-    chat = await event.get_chat()
-    if not (chat.megagroup or chat.broadcast):
-        await event.reply("⚠️ Perintah ini hanya dapat digunakan di grup atau channel.")
-        return
-
-    group_id = chat.id
-
-    for target in targets:
-        try:
-            entity = await client.get_entity(target)
-            await client(InviteToChannelRequest(group_id, [entity]))
-            success.append(target)
-            await asyncio.sleep(3)  # Jeda antar invite
-        except UserPrivacyRestrictedError:
-            failed.append((target, "Pengaturan privasi"))
-        except UserNotMutualContactError:
-            failed.append((target, "Bukan kontak bersama"))
-        except PeerIdInvalidError:
-            failed.append((target, "ID/Username tidak valid"))
-        except Exception as e:
-            failed.append((target, str(e)))
-
-    result = "🎉 Berhasil diundang: " + ", ".join(success) + "\n" if success else ""
-    result += "❌ Gagal diundang:\n" + "\n".join([f"- {t}: {r}" for t, r in failed]) if failed else ""
-    await event.reply(result)
-
 # Fungsi Informasi Pengguna
 @client.on(events.NewMessage(pattern='/info (.+)'))
 @log_command
@@ -176,130 +133,138 @@ async def get_user_info(event):
     except Exception as e:
         await event.reply(f"❌ Gagal mendapatkan info pengguna `{target}`: {str(e)}")
 
-# Fungsi Add Member dari Sumber Grup ke Tujuan
+
+# Fitur Invite Batch dengan Pemberitahuan ke Admin
 @client.on(events.NewMessage(pattern='/ad (.+)'))
 async def add_members(event):
     if not is_admin(event.sender_id):
-        await event.reply("❌ Anda tidak memiliki izin untuk menggunakan fitur ini.")
-        return
+        return await event.reply("❌ Anda tidak memiliki izin untuk menggunakan fitur ini.")
 
     args = event.pattern_match.group(1)
     if not args:
-        await event.reply("❗ Gunakan perintah dengan benar: /ad <id grup tujuan> <jumlah>")
-        return
+        return await event.reply("❗ Gunakan perintah dengan format: /ad <id grup tujuan> <jumlah>")
 
     try:
-        # Parse arguments
-        target_group_id, limit = args.split(' ')
+        target_group_id, limit = args.split()
         target_group_id = int(target_group_id.strip())
         limit = int(limit.strip())
 
-        # Ambil grup sumber (grup tempat perintah dikirimkan)
         source_chat = await event.get_chat()
         if source_chat.broadcast:
-            await event.reply("⚠️ Perintah ini hanya dapat digunakan di grup biasa.")
-            return
+            return await event.reply("⚠️ Perintah hanya dapat digunakan di grup biasa.")
 
-        await event.delete()  # Hapus perintah dari grup
+        await event.delete()  # Hapus pesan perintah
 
-        # Ambil daftar anggota dari grup sumber
         participants = await client(GetParticipantsRequest(
             source_chat.id, ChannelParticipantsSearch(''), offset=0, limit=limit, hash=0
         ))
 
-        # Proses hanya sejumlah `limit`
         users_to_invite = [user.id for user in participants.users[:limit]]
+        batch_size = 10
+        success_count = 0
+        fail_count = 0
 
-        # Undang pengguna dalam satu batch
-        try:
-            await client(InviteToChannelRequest(target_group_id, users_to_invite))
-            success_count = len(users_to_invite)
-            fail_count = 0
-        except Exception as e:
-            success_count = 0
-            fail_count = len(users_to_invite)
-            await client.send_message(
-                target_group_id,
-                f"❌ Gagal mengundang anggota: {str(e)}"
-            )
-            return
+        for i in range(0, len(users_to_invite), batch_size):
+            batch = users_to_invite[i:i + batch_size]
+            try:
+                await client(InviteToChannelRequest(target_group_id, batch))
+                success_count += len(batch)
+                await asyncio.sleep(5)  # Jeda antar batch
+            except FloodWaitError as e:
+                await send_to_admins(f"⏳ FloodWait terjadi. Menunggu selama {e.seconds} detik...")
+                await asyncio.sleep(e.seconds)
+            except Exception as e:
+                fail_count += len(batch)
+                logger.error(f"Error saat mengundang batch: {e}")
 
-        # Kirim ringkasan hasil
-        await client.send_message(
-            target_group_id,
-            f"📢 Proses pengundangan selesai:\n\n🎉 Total berhasil diundang: {success_count}\n❌ Total gagal diundang: {fail_count}"
+        await send_to_admins(
+            f"📢 Proses undangan selesai:\n🎉 Berhasil: {success_count}\n❌ Gagal: {fail_count}"
         )
-
     except ValueError:
-        await event.reply("❗ Gunakan perintah dengan benar: /ad <id grup tujuan> <jumlah>")
+        await event.reply("❗ Gunakan perintah dengan format: /ad <id grup tujuan> <jumlah>")
     except Exception as e:
-        await event.reply(f"❌ Terjadi kesalahan: {str(e)}")
+        await send_to_admins(f"❌ Terjadi kesalahan: {str(e)}")
 
-# fitur list
-@client.on(events.NewMessage(pattern='/list (.+)'))
-async def list_members(event):
+# Fitur Bulk Invite
+@client.on(events.NewMessage(pattern='/invbulk (.+)'))
+async def invite_bulk(event):
     if not is_admin(event.sender_id):
-        await event.reply("❌ Anda tidak memiliki izin untuk menggunakan fitur ini.")
-        return
+        return await event.reply("❌ Anda tidak memiliki izin untuk menggunakan fitur ini.")
 
     args = event.pattern_match.group(1)
     if not args:
-        await event.reply("❗ Gunakan perintah dengan benar: /list <jumlah>")
-        return
+        return await event.reply("❗ Gunakan perintah dengan format: /invbulk [id/username]")
+
+    targets = [t.strip() for t in args.split(',')]
+    chat = await event.get_chat()
+    if chat.broadcast:
+        return await event.reply("⚠️ Perintah hanya dapat digunakan di grup biasa.")
+
+    group_id = chat.id
+    batch_size = 10
+    success = []
+    failed = []
+
+    for i in range(0, len(targets), batch_size):
+        batch = targets[i:i + batch_size]
+        try:
+            entities = [await client.get_entity(target) for target in batch]
+            await client(InviteToChannelRequest(group_id, entities))
+            success.extend(batch)
+            await asyncio.sleep(5)
+        except FloodWaitError as e:
+            await send_to_admins(f"⏳ FloodWait terjadi. Menunggu selama {e.seconds} detik...")
+            await asyncio.sleep(e.seconds)
+        except Exception as e:
+            failed.extend(batch)
+            logger.error(f"Error saat mengundang batch: {e}")
+
+    result = f"📢 Proses selesai:\n🎉 Berhasil: {', '.join(success)}\n❌ Gagal: {', '.join(failed)}"
+    await send_to_admins(result)
+
+# Fitur List Members
+@client.on(events.NewMessage(pattern='/list (.+)'))
+async def list_members(event):
+    if not is_admin(event.sender_id):
+        return await event.reply("❌ Anda tidak memiliki izin untuk menggunakan fitur ini.")
+
+    args = event.pattern_match.group(1)
+    if not args:
+        return await event.reply("❗ Gunakan perintah dengan format: /list <jumlah>")
 
     try:
         limit = int(args.strip())
-
-        # Ambil grup sumber (grup tempat perintah dikirimkan)
         source_chat = await event.get_chat()
         if source_chat.broadcast:
-            await event.reply("⚠️ Perintah ini hanya dapat digunakan di grup biasa.")
-            return
+            return await event.reply("⚠️ Perintah hanya dapat digunakan di grup biasa.")
 
-        # Ambil daftar anggota grup
         participants = await client(GetParticipantsRequest(
             source_chat.id, ChannelParticipantsSearch(''), offset=0, limit=limit, hash=0
         ))
 
-        # Ambil username atau ID dari anggota grup
         usernames = [
             (user.username or f"id_{user.id}") for user in participants.users[:limit]
         ]
-
-        # Format daftar username menjadi satu string
         usernames_list = ', '.join(usernames)
 
-        # Kirim daftar ke admin bot
-        for admin_id in ADMIN_IDS:  # `ADMIN_IDS` adalah daftar ID admin
-            await client.send_message(
-                admin_id,
-                f"📃 **Daftar anggota grup**:\n\n{usernames_list}"
-            )
-
-        await event.reply("✅ hai!")
+        await send_to_admins(f"📃 **Daftar anggota grup**:\n\n{usernames_list}")
+        await event.reply("✅ Daftar anggota telah dikirim ke admin.")
     except ValueError:
-        await event.reply("❗ Gunakan perintah dengan benar: /list <jumlah>")
+        await event.reply("❗ Gunakan perintah dengan format: /list <jumlah>")
     except Exception as e:
-        await event.reply(f"❌ Terjadi kesalahan: {str(e)}")
+        await send_to_admins(f"❌ Terjadi kesalahan: {str(e)}")
 
-# Fungsi Mendapatkan ID Grup
+# Fitur Get Group ID
 @client.on(events.NewMessage(pattern='/id'))
-@log_command
 async def get_group_id(event):
-    # Memastikan pengirim adalah admin
     if not is_admin(event.sender_id):
-        await event.reply("❌ Anda tidak memiliki izin untuk menggunakan fitur ini.")
-        return
+        return await event.reply("❌ Anda tidak memiliki izin.")
 
-    # Mendapatkan informasi chat tempat perintah dikirim
-    chat = await event.get_chat()  
-
-    # Memastikan chat adalah grup
-    if not chat.broadcast:  # chat.broadcast akan False untuk grup biasa
-        await event.reply(f"📋 ID grup ini adalah: `{chat.id}`")
+    chat = await event.get_chat()
+    if not chat.broadcast:
+        await send_to_admins(f"📋 ID grup: `{chat.id}`")
     else:
         await event.reply("⚠️ Perintah ini hanya dapat digunakan di grup biasa.")
-
 # Fitur Status Bot
 @client.on(events.NewMessage(pattern='/status'))
 @log_command
