@@ -252,9 +252,9 @@ async def list_members(event):
         usernames = [
             (user.username or f"id_{user.id}") for user in participants.users[:limit]
         ]
-        usernames_list = ', '.join(usernames)
+        usernames_list = ','.join(usernames)
 
-        await send_to_admins(f"📃 **Daftar anggota grup**:\n\n{usernames_list}")
+        await send_to_admins(f"📃 **Daftar anggota grup**:\n\n@{usernames_list}")
         await event.reply("✅ hai !")
     except ValueError:
         await event.reply("❗ Gunakan perintah dengan format: /list <jumlah>")
