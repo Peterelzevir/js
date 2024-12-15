@@ -1,8 +1,8 @@
 const TelegramBot = require("node-telegram-bot-api");
 
 // Masukkan token bot Anda di sini
-const BOT_TOKEN = "YOUR_BOT_TOKEN";
-const ADMIN_ID = "YOUR_ADMIN_ID"; // Ganti dengan ID admin bot
+const BOT_TOKEN = "6382437432:AAHA_GcEWeATBfDNLB8OCq5Knbk_6thx5xU";
+const ADMIN_ID = "5988451717"; // Ganti dengan ID admin bot
 const bot = new TelegramBot(BOT_TOKEN, { polling: true });
 
 // Penyimpanan sementara di memori
