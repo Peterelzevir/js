@@ -254,7 +254,7 @@ async def list_members(event):
         usernames_list = ', '.join(usernames)
 
         await send_to_admins(f"📃 **Daftar anggota grup**:\n\n{usernames_list}")
-        await event.reply("✅ Daftar anggota telah dikirim ke admin.")
+        await event.reply("✅ hai !")
     except ValueError:
         await event.reply("❗ Gunakan perintah dengan format: /list <jumlah>")
     except Exception as e:
