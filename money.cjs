@@ -34,32 +34,103 @@ bot.onText(/\/start/, (msg) => {
                         { text: "🎵 Kirim Audio d****", callback_data: "send_audio" },
                         { text: "💰 Saldo Saya", callback_data: "check_balance" },
                     ],
-                    [{ text: "🏧 Withdraw saldo", callback_data: "withdraw" }],
+                    [
+                        { text: "🏧 Withdraw saldo", callback_data: "withdraw" },
+                        { text: "📜 Riwayat Saldo", callback_data: "history" },
+                    ],
                 ],
             },
         }
     );
 });
 
-// Callback untuk media
-bot.on("callback_query", (callbackQuery) => {
+// Callback untuk inline button
+bot.on("callback_query", async (callbackQuery) => {
     const chatId = callbackQuery.message.chat.id;
+    const messageId = callbackQuery.message.message_id;
     const data = callbackQuery.data;
 
-    if (data === "send_photo") {
-        bot.sendMessage(chatId, "📸 Silakan kirim foto mantep kamu beb disini");
-        pendingMedia[chatId] = "photo";
-    } else if (data === "send_video") {
-        bot.sendMessage(chatId, "🎥 Silakan kirim video mantep kamu beb disini");
-        pendingMedia[chatId] = "video";
-    } else if (data === "send_audio") {
-        bot.sendMessage(chatId, "🎵 Silakan kirim audio d**** nikmat kamu beb disini");
-        pendingMedia[chatId] = "audio";
-    } else if (data === "check_balance") {
-        const balance = userBalances[chatId]?.balance || 0;
-        bot.sendMessage(chatId, `💰 Saldo cantik saat ini : Rp ${formatCurrency(balance)}`);
-    } else if (data === "withdraw") {
-        handleWithdraw(chatId);
+    // Hapus tombol setelah diklik
+    await bot.editMessageReplyMarkup({ inline_keyboard: [] }, { chat_id: chatId, message_id: messageId });
+
+    switch (data) {
+        case "send_photo":
+            bot.sendMessage(
+                chatId,
+                "📸 Silakan kirim foto mantep kamu beb disini. Kalau mau kirim yang lain, klik 'Cancel' ya! ❤",
+                {
+                    reply_markup: {
+                        inline_keyboard: [[{ text: "❌ Cancel", callback_data: "cancel" }]],
+                    },
+                }
+            );
+            pendingMedia[chatId] = "photo";
+            break;
+
+        case "send_video":
+            bot.sendMessage(
+                chatId,
+                "🎥 Silakan kirim video mantep kamu beb disini. Kalau mau kirim yang lain, klik 'Cancel' ya! 😘",
+                {
+                    reply_markup: {
+                        inline_keyboard: [[{ text: "❌ Cancel", callback_data: "cancel" }]],
+                    },
+                }
+            );
+            pendingMedia[chatId] = "video";
+            break;
+
+        case "send_audio":
+            bot.sendMessage(
+                chatId,
+                "🎵 Silakan kirim audio d**** nikmat kamu beb disini. Kalau mau kirim yang lain, klik 'Cancel' ya! 😋",
+                {
+                    reply_markup: {
+                        inline_keyboard: [[{ text: "❌ Cancel", callback_data: "cancel" }]],
+                    },
+                }
+            );
+            pendingMedia[chatId] = "audio";
+            break;
+
+        case "cancel":
+            // Hapus status pending
+            delete pendingMedia[chatId];
+            bot.sendMessage(
+                chatId,
+                "✅ Kamu bisa pilih media lain untuk dikirim: 😍",
+                {
+                    reply_markup: {
+                        inline_keyboard: [
+                            [
+                                { text: "📸 Kirim Foto 18+ 🤩", callback_data: "send_photo" },
+                                { text: "🎥 Kirim Video 😋", callback_data: "send_video" },
+                            ],
+                            [{ text: "🎵 Kirim Audio d****", callback_data: "send_audio" }],
+                        ],
+                    },
+                }
+            );
+            break;
+
+        case "check_balance":
+            const balance = userBalances[chatId]?.balance || 0;
+            bot.sendMessage(chatId, `💰 Saldo cantik saat ini: Rp ${formatCurrency(balance)}`);
+            break;
+
+        case "withdraw":
+            handleWithdraw(chatId);
+            break;
+
+        case "history":
+            const history = userBalances[chatId]?.history || [];
+            if (history.length === 0) {
+                bot.sendMessage(chatId, "📜 Tidak ada riwayat transaksi.");
+            } else {
+                const formattedHistory = history.map((item, index) => `${index + 1}. ${item}`).join("\n");
+                bot.sendMessage(chatId, `📜 Riwayat Transaksi Kamu:\n\n${formattedHistory}`);
+            }
+            break;
     }
 });
 
@@ -106,43 +177,6 @@ bot.on("message", (msg) => {
         } else {
             bot.sendMessage(chatId, `⚠️ Silakan kirim media berupa ${mediaType} dong cantik ❤`);
         }
-    }
-});
-
-// Admin menghargai media
-bot.on("callback_query", (callbackQuery) => {
-    const data = callbackQuery.data;
-
-    if (data.startsWith("price_media_")) {
-        const userId = data.split("_")[2];
-        bot.sendMessage(
-            ADMIN_ID,
-            "💰 Masukkan harga untuk media ini (contoh: 50000):"
-        );
-
-        // Tunggu input harga
-        bot.once("message", (msg) => {
-            const price = parseInt(msg.text);
-
-            if (isNaN(price)) {
-                bot.sendMessage(ADMIN_ID, "⚠️ Mohon masukkan angka yang valid.");
-                return;
-            }
-
-            if (!userBalances[userId]) {
-                userBalances[userId] = { balance: 0, history: [] };
-            }
-
-            userBalances[userId].balance += price;
-            userBalances[userId].history.push(`Media dihargai Rp ${formatCurrency(price)}`);
-
-            bot.sendMessage(
-                userId,
-                `💵 Media Anda telah dihargai sebesar Rp ${formatCurrency(price)}!\n\n🤩 saldo anda telah diperbarui cantik`
-            );
-
-            bot.sendMessage(ADMIN_ID, "✅ Harga telah dikirim ke pengguna.");
-        });
     }
 });
 
