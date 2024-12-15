@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 # Konfigurasi API Telegram
 API_ID = '23207350'
 API_HASH = '03464b6c80a5051eead6835928e48189'
-SESSION_NAME = 'mac'
+SESSION_NAME = 'macbook'
 
 # Nama perangkat nyata
 client = TelegramClient(
