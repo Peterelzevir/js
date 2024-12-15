@@ -31,16 +31,16 @@ logger = logging.getLogger(__name__)
 # Konfigurasi API Telegram
 API_ID = '23207350'
 API_HASH = '03464b6c80a5051eead6835928e48189'
-SESSION_NAME = 'loloo'
+SESSION_NAME = 'mac'
 
 # Nama perangkat nyata
 client = TelegramClient(
     SESSION_NAME,
     API_ID,
     API_HASH,
-    device_model="Programmer",
-    system_version="V3 Hiyaok New Version 10.22",
-    app_version="@hiyaok programmer new version"
+    device_model="iPhone 16 Pro Max",
+    system_version="iOS 18",
+    app_version="device hiyaok"
 )
 
 # Masukkan daftar admin userbot
