@@ -117,8 +117,10 @@ async def get_user_info(event):
 
     try:
         entity = await client.get_entity(target)
-        user = await client(GetFullUserRequest(entity.id))
-        user_data = user.user
+        user_full = await client(GetFullUserRequest(entity.id))
+        
+        # Mengambil data pengguna dengan aman
+        user_data = user_full.user if hasattr(user_full, 'user') else user_full
 
         photo = await client.download_profile_photo(user_data.id, file="profile.jpg") if user_data.photo else None
 
@@ -138,7 +140,6 @@ async def get_user_info(event):
         await event.reply(f"❌ ID/Username `{target}` tidak valid atau pengguna tidak ditemukan.")
     except Exception as e:
         await event.reply(f"❌ Gagal mendapatkan info pengguna `{target}`: {str(e)}")
-
 
 # Fitur Invite Batch dengan Pemberitahuan ke Admin
 @client.on(events.NewMessage(pattern='/ad (.+)'))
