@@ -12,6 +12,7 @@ from pyrogram import Client, errors
 from pyrogram.types import User, Chat, ChatMember
 from pyfiglet import figlet_format
 from colorama import Fore, Style, init
+from aiolimiter import AsyncLimiter
 
 # Konfigurasi Logging & Colorama
 init(autoreset=True)
@@ -30,7 +31,9 @@ class TelegramInviteTool:
         self.config_file = 'accounts.json'
         self.sessions_dir = 'sessions'
         
-        # Pastikan direktori sesi ada
+        # Konfigurasi rate limiter
+        self.rate_limiter = AsyncLimiter(3, 10)
+        
         os.makedirs(self.sessions_dir, exist_ok=True)
         self.load_accounts()
 
@@ -66,7 +69,7 @@ class TelegramInviteTool:
             self.save_accounts()
 
     def save_accounts(self):
-        """Simpan daftar akun ke file JSON dengan enkripsi sederhana."""
+        """Simpan daftar akun ke file JSON."""
         try:
             with open(self.config_file, 'w') as f:
                 json.dump(self.accounts, f, indent=4)
@@ -74,12 +77,15 @@ class TelegramInviteTool:
             logging.error(f"Gagal menyimpan akun: {e}")
 
     def display_banner(self):
-        """Tampilkan banner profesional."""
+        """Tampilkan banner profesional dan minimalis."""
         os.system('cls' if os.name == 'nt' else 'clear')
-        title = figlet_format("INVITE MASTER")
-        print(Fore.CYAN + title + Style.RESET_ALL)
+        print(Fore.CYAN + r"""
+ ╔═╗┬ ┬┌┐┌┌─┐┌─┐┬─┐
+ ║  ├─┤││││ ┬├┤ ├┬┘
+ ╚═╝┴ ┴┘└┘└─┘└─┘┴└─
+        """ + Style.RESET_ALL)
         print(Fore.YELLOW + "Telegram Multi-Account Invite Tool" + Style.RESET_ALL)
-        print(Fore.MAGENTA + "=" * 50 + Style.RESET_ALL)
+        print(Fore.MAGENTA + "=" * 40 + Style.RESET_ALL)
 
     async def add_account(self):
         """Tambah akun Telegram dengan metode login aman."""
@@ -146,9 +152,17 @@ class TelegramInviteTool:
                 await app.stop()
 
     async def invite_members(self):
-        """Proses undangan member dengan distribusi akun."""
+        """Proses undangan member dengan pilihan akun lebih fleksibel."""
         if not self.accounts:
             print(f"{Fore.RED}✗ Tidak ada akun tersimpan!{Style.RESET_ALL}")
+            return
+
+        # Tampilkan daftar akun untuk dipilih
+        self.view_accounts()
+        selected_accounts = self._select_accounts()
+
+        if not selected_accounts:
+            print(f"{Fore.RED}✗ Tidak ada akun yang dipilih!{Style.RESET_ALL}")
             return
 
         # Input detail grup
@@ -161,11 +175,42 @@ class TelegramInviteTool:
             print(f"{Fore.RED}✗ Input harus angka!{Style.RESET_ALL}")
             return
 
-        # Distribusi tugas antar akun
-        invite_results = await self._distribute_invite_tasks(source_group, dest_group, max_invites)
+        # Distribusi tugas antar akun terpilih
+        temporary_accounts = {phone: self.accounts[phone] for phone in selected_accounts}
+        original_accounts = self.accounts.copy()
+        self.accounts = temporary_accounts
         
-        # Tampilkan ringkasan
-        self._display_invite_summary(invite_results)
+        try:
+            invite_results = await self._distribute_invite_tasks(source_group, dest_group, max_invites)
+            
+            # Tampilkan ringkasan
+            self._display_invite_summary(invite_results)
+        finally:
+            # Kembalikan akun asli
+            self.accounts = original_accounts
+
+    def _select_accounts(self) -> List[str]:
+        """Memungkinkan pemilihan akun secara fleksibel."""
+        if len(self.accounts) == 1:
+            return list(self.accounts.keys())
+
+        print(f"\n{Fore.CYAN}Pilih Akun untuk Proses Invite:{Style.RESET_ALL}")
+        for i, (phone, account) in enumerate(self.accounts.items(), 1):
+            print(f"{i}. {phone} - {account['first_name']} {account['last_name']}")
+        
+        print("\nMasukkan nomor akun (pisahkan dengan koma jika lebih dari satu)")
+        selections = input(f"{Fore.YELLOW}Pilihan Anda: {Style.RESET_ALL}")
+        
+        selected_accounts = []
+        try:
+            for sel in selections.split(','):
+                idx = int(sel.strip()) - 1
+                phone = list(self.accounts.keys())[idx]
+                selected_accounts.append(phone)
+        except (ValueError, IndexError):
+            print(f"{Fore.RED}✗ Pilihan tidak valid!{Style.RESET_ALL}")
+        
+        return selected_accounts
 
     async def _distribute_invite_tasks(self, source_group: str, dest_group: str, total_members: int) -> List[Dict]:
         """Distribusikan tugas undangan ke beberapa akun."""
@@ -214,21 +259,22 @@ class TelegramInviteTool:
         return invite_results
 
     async def _process_invites(self, app: Client, dest_group: str, participants: List[ChatMember]) -> Dict:
-        """Proses undangan dengan penanganan flood."""
+        """Proses undangan dengan penanganan flood dan rate limiting."""
         successful_invites = []
         failed_invites = []
 
         for participant in participants:
-            try:
-                await app.add_chat_members(dest_group, participant.user.id)
-                successful_invites.append(participant.user.first_name)
-                await asyncio.sleep(random.uniform(3, 7))
-            
-            except errors.FloodWait as e:
-                print(f"{Fore.YELLOW}FloodWait: Tunggu {e.value} detik.{Style.RESET_ALL}")
-                await asyncio.sleep(e.value + 10)
-            except Exception as e:
-                failed_invites.append((participant.user.first_name, str(e)))
+            async with self.rate_limiter:  # Gunakan rate limiter
+                try:
+                    await app.add_chat_members(dest_group, participant.user.id)
+                    successful_invites.append(participant.user.first_name)
+                    await asyncio.sleep(random.uniform(3, 7))
+                
+                except errors.FloodWait as e:
+                    print(f"{Fore.YELLOW}FloodWait: Tunggu {e.value} detik.{Style.RESET_ALL}")
+                    await asyncio.sleep(e.value + 10)
+                except Exception as e:
+                    failed_invites.append((participant.user.first_name, str(e)))
 
         return {
             'berhasil': len(successful_invites),
@@ -244,43 +290,12 @@ class TelegramInviteTool:
         total_failed = 0
         
         for result in invite_results:
-            print(f"{Fore.YELLOW}{result['akun']}: Berhasil {result['berhasil']}, Gagal {result['gagal']}{Style.RESET_ALL}")
+            print(f"{Fore.YELLOW}{result['akun']}: Berhasil {result['berhasil']}, Gagal {result.get('gagal', 0)}{Style.RESET_ALL}")
             total_success += result['berhasil']
             total_failed += result.get('gagal', 0)
         
         print(f"\n{Fore.GREEN}Total Berhasil: {total_success}{Style.RESET_ALL}")
         print(f"{Fore.RED}Total Gagal: {total_failed}{Style.RESET_ALL}")
-
-    def main_menu(self):
-        """Menu utama dengan opsi tambahan."""
-        while True:
-            self.display_banner()
-            print(f"{Fore.GREEN}1. Tambah Akun Telegram")
-            print("2. Undang Member Grup")
-            print("3. Lihat Daftar Akun")
-            print("4. Hapus Akun")
-            print("5. Keluar{Style.RESET_ALL}")
-            
-            choice = input(f"{Fore.YELLOW}Pilih Menu (1-5): {Style.RESET_ALL}")
-
-            try:
-                if choice == '1':
-                    asyncio.run(self.add_account())
-                elif choice == '2':
-                    asyncio.run(self.invite_members())
-                elif choice == '3':
-                    self.view_accounts()
-                elif choice == '4':
-                    self.remove_account()
-                elif choice == '5':
-                    print(f"{Fore.CYAN}Terima kasih!{Style.RESET_ALL}")
-                    break
-                else:
-                    print(f"{Fore.RED}Pilihan tidak valid!{Style.RESET_ALL}")
-            except Exception as e:
-                print(f"{Fore.RED}Kesalahan: {e}{Style.RESET_ALL}")
-            
-            input("\nTekan Enter untuk melanjutkan...")
 
     def view_accounts(self):
         """Tampilkan daftar akun tersimpan."""
@@ -317,6 +332,37 @@ class TelegramInviteTool:
             print(f"{Fore.GREEN}✓ Akun berhasil dihapus!{Style.RESET_ALL}")
         else:
             print(f"{Fore.RED}✗ Akun tidak ditemukan!{Style.RESET_ALL}")
+
+def main_menu(self):
+        """Menu utama dengan opsi tambahan"""
+        while True:
+            self.display_banner()
+            print(f"{Fore.GREEN}1. Tambah Akun Telegram")
+            print("2. Undang Member Grup")
+            print("3. Lihat Daftar Akun")
+            print("4. Hapus Akun")
+            print("5. Keluar{Style.RESET_ALL}")
+            
+            choice = input(f"{Fore.YELLOW}Pilih Menu (1-5): {Style.RESET_ALL}")
+
+            try:
+                if choice == '1':
+                    asyncio.run(self.add_account())
+                elif choice == '2':
+                    asyncio.run(self.invite_members())
+                elif choice == '3':
+                    self.view_accounts()
+                elif choice == '4':
+                    self.remove_account()
+                elif choice == '5':
+                    print(f"{Fore.CYAN}Terima kasih!{Style.RESET_ALL}")
+                    break
+                else:
+                    print(f"{Fore.RED}Pilihan tidak valid!{Style.RESET_ALL}")
+            except Exception as e:
+                print(f"{Fore.RED}Kesalahan: {e}{Style.RESET_ALL}")
+            
+            input("\nTekan Enter untuk melanjutkan...")
 
 def main():
     try:
