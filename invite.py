@@ -58,7 +58,7 @@ class TelegramInviteTool:
         phone_number = input(f"{Fore.YELLOW}Masukkan Nomor Telepon (dengan kode negara): {Style.RESET_ALL}")
 
         app = Client(
-            session_name=f"{phone_number}",
+            session=f"{phone_number}",  # Ganti session_name dengan session
             api_id=int(api_id),
             api_hash=api_hash,
             device_model="iPhone 16 Pro Max",
@@ -69,7 +69,7 @@ class TelegramInviteTool:
         try:
             await app.start()
             # Minta kode OTP atau password 2FA jika diperlukan
-            if app.is_user_authorized:
+            if app.is_connected:
                 session_str = await app.export_session_string()
                 self.accounts[phone_number] = {
                     'api_id': api_id,
@@ -119,7 +119,7 @@ class TelegramInviteTool:
 
         # Konfigurasi klien
         app = Client(
-            session_string=selected_account['session_string'],
+            session=selected_account['session_string'],
             api_id=int(selected_account['api_id']),
             api_hash=selected_account['api_hash']
         )
