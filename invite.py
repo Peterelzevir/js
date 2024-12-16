@@ -19,7 +19,7 @@ logging.basicConfig(
     level=logging.INFO,
     format=f'{Fore.CYAN}[%(levelname)s]{Style.RESET_ALL} %(message)s',
     handlers=[
-        logging.FileHandler("invite_log.txt"),
+        logging.FileHandler("invite_logs.txt"),
         logging.StreamHandler()
     ]
 )
@@ -27,7 +27,7 @@ logging.basicConfig(
 class TelegramInviteTool:
     def __init__(self):
         self.accounts = {}
-        self.config_file = 'accounts.json'
+        self.config_file = 'akun.json'
         self.load_accounts()
 
     def load_accounts(self):
@@ -43,6 +43,14 @@ class TelegramInviteTool:
         """Simpan daftar akun ke file JSON."""
         with open(self.config_file, 'w') as f:
             json.dump(self.accounts, f, indent=4)
+
+        def display_banner(self):
+        """Tampilkan banner dengan PyFiglet."""
+        title = figlet_format("INVITE TOOL")
+        subtitle = "by Hiyaok Programmer"
+        print(Fore.CYAN + title + Style.RESET_ALL)
+        print(Fore.YELLOW + subtitle + Style.RESET_ALL)
+        print(Fore.MAGENTA + "=" * 50 + Style.RESET_ALL)
 
     async def add_account(self):
         """Tambah akun baru dengan login Telegram."""
@@ -235,30 +243,22 @@ class TelegramInviteTool:
     def main_menu(self):
         """Menu utama."""
         while True:
-            print(f"{Fore.CYAN}{'='*50}{Style.RESET_ALL}")
-            print(f"{Fore.GREEN}TELEGRAM MULTI-INVITE TOOL{Style.RESET_ALL}")
-            print(f"{Fore.CYAN}{'='*50}{Style.RESET_ALL}")
-            
-            print(f"{Fore.YELLOW}1. Tambah Akun")
+            self.display_banner()
+            print(f"{Fore.GREEN}1. Tambah Akun")
             print("2. Undang Member")
             print("3. Keluar{Style.RESET_ALL}")
-            
-            try:
-                choice = input(f"{Fore.GREEN}Pilih menu (1-3): {Style.RESET_ALL}")
+            choice = input(f"{Fore.YELLOW}Pilih menu (1-3): {Style.RESET_ALL}")
 
-                if choice == '1':
-                    asyncio.run(self.add_account())
-                elif choice == '2':
-                    asyncio.run(self.invite_members())
-                elif choice == '3':
-                    break
-                else:
-                    print(f"{Fore.RED}Pilihan tidak valid!{Style.RESET_ALL}")
-            
-            except KeyboardInterrupt:
-                print(f"\n{Fore.YELLOW}Operasi dibatalkan.{Style.RESET_ALL}")
-            except Exception as e:
-                print(f"{Fore.RED}Terjadi kesalahan: {e}{Style.RESET_ALL}")
+            if choice == '1':
+                asyncio.run(self.add_account())
+            elif choice == '2':
+                asyncio.run(self.invite_members())
+            elif choice == '3':
+                print(f"{Fore.CYAN}Sampai jumpa!{Style.RESET_ALL}")
+                break
+            else:
+                print(f"{Fore.RED}Pilihan tidak valid!{Style.RESET_ALL}")
+
 
 def main():
     try:
