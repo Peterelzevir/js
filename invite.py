@@ -7,6 +7,7 @@ from colorama import Fore, Style, init
 import json
 import logging
 import getpass
+import sys
 
 # Inisialisasi Colorama
 init(autoreset=True)
@@ -16,7 +17,7 @@ logging.basicConfig(
     level=logging.INFO,
     format=f'{Fore.CYAN}[%(levelname)s]{Style.RESET_ALL} %(message)s',
     handlers=[
-        logging.FileHandler("invite_log.txt"),
+        logging.FileHandler("invite_logs.txt"),
         logging.StreamHandler()
     ]
 )
@@ -33,7 +34,7 @@ def display_banner():
 class TelegramInviteTool:
     def __init__(self):
         self.accounts = {}
-        self.config_file = 'accounts.json'
+        self.config_file = 'akun.json'
         self.load_accounts()
 
     def load_accounts(self):
@@ -42,60 +43,78 @@ class TelegramInviteTool:
             try:
                 with open(self.config_file, 'r') as f:
                     self.accounts = json.load(f)
-            except:
+            except json.JSONDecodeError:
                 self.accounts = {}
 
     def save_accounts(self):
         """Simpan daftar akun ke file JSON."""
         with open(self.config_file, 'w') as f:
-            json.dump(self.accounts, f)
+            json.dump(self.accounts, f, indent=4)
 
     async def add_account(self):
         """Tambah akun baru dengan login Telegram."""
         print(f"{Fore.CYAN}[Tambah Akun Telegram]{Style.RESET_ALL}")
-        api_id = input(f"{Fore.YELLOW}Masukkan API ID: {Style.RESET_ALL}")
-        api_hash = input(f"{Fore.YELLOW}Masukkan API Hash: {Style.RESET_ALL}")
-        phone_number = input(f"{Fore.YELLOW}Masukkan Nomor Telepon (dengan kode negara): {Style.RESET_ALL}")
+        
+        while True:
+            try:
+                api_id = input(f"{Fore.YELLOW}Masukkan API ID: {Style.RESET_ALL}")
+                api_hash = input(f"{Fore.YELLOW}Masukkan API Hash: {Style.RESET_ALL}")
+                phone_number = input(f"{Fore.YELLOW}Masukkan Nomor Telepon (dengan kode negara): {Style.RESET_ALL}")
 
-        app = Client(
-            session=f"{phone_number}",  # Ganti session_name dengan session
-            api_id=int(api_id),
-            api_hash=api_hash,
-            device_model="iPhone 16 Pro Max",
-            system_version="iOS 18",
-            lang_code="id"
-        )
+                # Validasi input
+                if not api_id or not api_hash or not phone_number:
+                    print(f"{Fore.RED}Semua field harus diisi!{Style.RESET_ALL}")
+                    continue
 
-        try:
-            await app.start()
-            # Minta kode OTP atau password 2FA jika diperlukan
-            if app.is_connected:
-                session_str = await app.export_session_string()
-                self.accounts[phone_number] = {
-                    'api_id': api_id,
-                    'api_hash': api_hash,
-                    'session_string': session_str
-                }
-                self.save_accounts()
-                print(f"{Fore.GREEN}✓ Akun berhasil ditambahkan!{Style.RESET_ALL}")
-            else:
-                print(f"{Fore.YELLOW}Memerlukan kode verifikasi atau 2FA...{Style.RESET_ALL}")
-                await app.send_code(phone_number)
+                app = Client(
+                    name=phone_number,
+                    api_id=int(api_id),
+                    api_hash=api_hash,
+                    device_model="iPhone 16 Pro Max",
+                    system_version="iOS 18",
+                    lang_code="id"
+                )
+
+                await app.start()
+
+                # Kirim kode verifikasi
+                sent_code = await app.send_code(phone_number)
+                
                 code = input(f"{Fore.GREEN}Masukkan kode OTP yang diterima: {Style.RESET_ALL}")
-                password = getpass.getpass(f"{Fore.GREEN}Masukkan password 2FA (jika ada): {Style.RESET_ALL}")
-                await app.sign_in(phone_number, code, password)
-                session_str = await app.export_session_string()
+                
+                try:
+                    # Coba sign in
+                    await app.sign_in(phone_number, sent_code.phone_code_hash, code)
+                except errors.SessionPasswordNeeded:
+                    # Jika dibutuhkan password 2FA
+                    password = getpass.getpass(f"{Fore.GREEN}Masukkan password 2FA: {Style.RESET_ALL}")
+                    await app.check_password(password)
+
+                # Ambil session string
+                session_string = await app.export_session_string()
+                
+                # Simpan informasi akun
                 self.accounts[phone_number] = {
                     'api_id': api_id,
                     'api_hash': api_hash,
-                    'session_string': session_str
+                    'session_string': session_string
                 }
                 self.save_accounts()
-                print(f"{Fore.GREEN}✓ Akun berhasil ditambahkan setelah 2FA!{Style.RESET_ALL}")
-        except Exception as e:
-            print(f"{Fore.RED}✗ Gagal menambahkan akun: {e}{Style.RESET_ALL}")
-        finally:
-            await app.stop()
+
+                print(f"{Fore.GREEN}✓ Akun berhasil ditambahkan!{Style.RESET_ALL}")
+                break
+
+            except errors.PhoneCodeInvalid:
+                print(f"{Fore.RED}✗ Kode OTP tidak valid. Silakan coba lagi.{Style.RESET_ALL}")
+            except errors.PhoneCodeExpired:
+                print(f"{Fore.RED}✗ Kode OTP sudah kadaluarsa. Silakan minta ulang.{Style.RESET_ALL}")
+            except errors.BadRequest as e:
+                print(f"{Fore.RED}✗ Kesalahan: {e}{Style.RESET_ALL}")
+            except Exception as e:
+                print(f"{Fore.RED}✗ Gagal menambahkan akun: {e}{Style.RESET_ALL}")
+            finally:
+                if 'app' in locals():
+                    await app.stop()
 
     async def invite_members(self):
         """Proses undangan member dari grup target ke grup tujuan."""
@@ -108,18 +127,27 @@ class TelegramInviteTool:
         for idx, phone in enumerate(self.accounts.keys(), start=1):
             print(f"{Fore.YELLOW}{idx}. {phone}{Style.RESET_ALL}")
 
-        account_choice = int(input(f"{Fore.GREEN}Pilih akun untuk digunakan: {Style.RESET_ALL}"))
-        selected_phone = list(self.accounts.keys())[account_choice - 1]
-        selected_account = self.accounts[selected_phone]
+        try:
+            account_choice = int(input(f"{Fore.GREEN}Pilih akun untuk digunakan: {Style.RESET_ALL}"))
+            selected_phone = list(self.accounts.keys())[account_choice - 1]
+            selected_account = self.accounts[selected_phone]
+        except (ValueError, IndexError):
+            print(f"{Fore.RED}✗ Pilihan akun tidak valid!{Style.RESET_ALL}")
+            return
 
         # Input grup
         source_group = input(f"{Fore.YELLOW}Masukkan username/link grup sumber: {Style.RESET_ALL}")
         dest_group = input(f"{Fore.YELLOW}Masukkan username/link grup tujuan: {Style.RESET_ALL}")
-        max_invites = int(input(f"{Fore.YELLOW}Masukkan jumlah maksimal member untuk diundang: {Style.RESET_ALL}"))
+        
+        try:
+            max_invites = int(input(f"{Fore.YELLOW}Masukkan jumlah maksimal member untuk diundang: {Style.RESET_ALL}"))
+        except ValueError:
+            print(f"{Fore.RED}✗ Jumlah undangan harus berupa angka!{Style.RESET_ALL}")
+            return
 
         # Konfigurasi klien
         app = Client(
-            session=selected_account['session_string'],
+            session_string=selected_account['session_string'],
             api_id=int(selected_account['api_id']),
             api_hash=selected_account['api_hash']
         )
@@ -132,24 +160,51 @@ class TelegramInviteTool:
             await app.join_chat(dest_group)
 
             # Ambil peserta grup sumber
-            participants = await app.get_chat_members(source_group)
+            participants = []
+            async for member in app.get_chat_members(source_group):
+                participants.append(member)
+                if len(participants) >= max_invites:
+                    break
+
             print(f"{Fore.GREEN}✓ {len(participants)} anggota ditemukan di grup sumber.{Style.RESET_ALL}")
 
             # Proses undangan
             invited_count = 0
-            for participant in participants[:max_invites]:
+            failed_invites = []
+
+            for participant in participants:
                 try:
-                    await app.add_chat_members(dest_group, participant.user.id)
-                    invited_count += 1
-                    logging.info(f"✓ {participant.user.first_name} berhasil diundang.")
-                    await asyncio.sleep(random.uniform(3, 6))
+                    # Hindari mengundang admin atau bot
+                    if not participant.user.is_bot:
+                        await app.add_chat_members(dest_group, participant.user.id)
+                        invited_count += 1
+                        logging.info(f"✓ {participant.user.first_name} berhasil diundang.")
+                        
+                        # Tambah delay acak untuk menghindari flood
+                        await asyncio.sleep(random.uniform(3, 7))
+                
                 except errors.FloodWait as e:
                     logging.warning(f"FloodWait: Harus tunggu {e.value} detik.")
-                    await asyncio.sleep(e.value + 5)
+                    await asyncio.sleep(e.value + 10)
+                except errors.UserPrivacyRestricted:
+                    failed_invites.append(participant.user.first_name)
+                    logging.error(f"✗ Tidak dapat mengundang {participant.user.first_name} karena privasi.")
+                except errors.UserNotMutualContact:
+                    failed_invites.append(participant.user.first_name)
+                    logging.error(f"✗ {participant.user.first_name} bukan kontak mutual.")
                 except Exception as e:
+                    failed_invites.append(participant.user.first_name)
                     logging.error(f"✗ Gagal mengundang {participant.user.first_name}: {e}")
 
             print(f"{Fore.GREEN}✓ Proses selesai. Total anggota yang berhasil diundang: {invited_count}{Style.RESET_ALL}")
+            
+            if failed_invites:
+                print(f"{Fore.YELLOW}Gagal mengundang ({len(failed_invites)}) anggota:{Style.RESET_ALL}")
+                for name in failed_invites[:10]:  # Tampilkan maks 10 nama
+                    print(f"{Fore.RED}- {name}{Style.RESET_ALL}")
+
+        except Exception as e:
+            print(f"{Fore.RED}✗ Kesalahan umum: {e}{Style.RESET_ALL}")
         finally:
             await app.stop()
 
@@ -160,18 +215,31 @@ class TelegramInviteTool:
             print(f"{Fore.GREEN}1. Tambah Akun")
             print("2. Undang Member")
             print("3. Keluar{Style.RESET_ALL}")
-            choice = input(f"{Fore.YELLOW}Pilih menu (1-3): {Style.RESET_ALL}")
+            
+            try:
+                choice = input(f"{Fore.YELLOW}Pilih menu (1-3): {Style.RESET_ALL}")
 
-            if choice == '1':
-                asyncio.run(self.add_account())
-            elif choice == '2':
-                asyncio.run(self.invite_members())
-            elif choice == '3':
-                break
-            else:
-                print(f"{Fore.RED}Pilihan tidak valid!{Style.RESET_ALL}")
+                if choice == '1':
+                    asyncio.run(self.add_account())
+                elif choice == '2':
+                    asyncio.run(self.invite_members())
+                elif choice == '3':
+                    break
+                else:
+                    print(f"{Fore.RED}Pilihan tidak valid!{Style.RESET_ALL}")
+            except KeyboardInterrupt:
+                print(f"\n{Fore.YELLOW}Operasi dibatalkan.{Style.RESET_ALL}")
+            except Exception as e:
+                print(f"{Fore.RED}Terjadi kesalahan: {e}{Style.RESET_ALL}")
 
 # Jalankan program
+def main():
+    try:
+        tool = TelegramInviteTool()
+        tool.main_menu()
+    except Exception as e:
+        print(f"{Fore.RED}Kesalahan fatal: {e}{Style.RESET_ALL}")
+        sys.exit(1)
+
 if __name__ == "__main__":
-    tool = TelegramInviteTool()
-    tool.main_menu()
+    main()
