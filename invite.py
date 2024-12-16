@@ -362,16 +362,15 @@ class TelegramInviteTool:
 def main():
     try:
         tool = TelegramInviteTool()
-        print(type(tool))  # Check if it's the correct type
-        print(dir(tool))   # List available methods and attributes
-        tool.main_menu()   # Call main_menu method
+        print(f"Instance Tool: {tool}")  # Output debugging
+        print(f"Metode yang Tersedia: {dir(tool)}")  # Daftar metode
+        tool.main_menu()
     except KeyboardInterrupt:
         print(f"\n{Fore.CYAN}Operasi dibatalkan.{Style.RESET_ALL}")
     except Exception as e:
         logging.error(traceback.format_exc())
         print(f"{Fore.RED}Kesalahan fatal: {e}{Style.RESET_ALL}")
         sys.exit(1)
-
 
 if __name__ == "__main__":
      main()
