@@ -360,15 +360,18 @@ class TelegramInviteTool:
              input("\nTekan Enter untuk melanjutkan...")
 
 def main():
-     try:
-         tool = TelegramInviteTool()
-         tool.main_menu()
-     except KeyboardInterrupt:
-         print(f"\n{Fore.CYAN}Operasi dibatalkan.{Style.RESET_ALL}")
-     except Exception as e:
-         logging.error(traceback.format_exc())
-         print(f"{Fore.RED}Kesalahan fatal: {e}{Style.RESET_ALL}")
-         sys.exit(1)
+    try:
+        tool = TelegramInviteTool()
+        print(type(tool))  # Check if it's the correct type
+        print(dir(tool))   # List available methods and attributes
+        tool.main_menu()   # Call main_menu method
+    except KeyboardInterrupt:
+        print(f"\n{Fore.CYAN}Operasi dibatalkan.{Style.RESET_ALL}")
+    except Exception as e:
+        logging.error(traceback.format_exc())
+        print(f"{Fore.RED}Kesalahan fatal: {e}{Style.RESET_ALL}")
+        sys.exit(1)
+
 
 if __name__ == "__main__":
      main()
