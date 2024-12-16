@@ -2,12 +2,14 @@ import os
 import asyncio
 import random
 from pyrogram import Client, errors
+from pyrogram.types import User
 from pyfiglet import figlet_format
 from colorama import Fore, Style, init
 import json
 import logging
 import getpass
 import sys
+import time
 
 # Inisialisasi Colorama
 init(autoreset=True)
@@ -17,24 +19,15 @@ logging.basicConfig(
     level=logging.INFO,
     format=f'{Fore.CYAN}[%(levelname)s]{Style.RESET_ALL} %(message)s',
     handlers=[
-        logging.FileHandler("invite_logs.txt"),
+        logging.FileHandler("invite_log.txt"),
         logging.StreamHandler()
     ]
 )
 
-# Fungsi untuk Menampilkan Banner
-def display_banner():
-    title = figlet_format("HIYAOK PROGRAMMER")
-    subtitle = "TOOLS INVITE by @hiyaok"
-    print(Fore.CYAN + title + Style.RESET_ALL)
-    print(Fore.YELLOW + subtitle + Style.RESET_ALL)
-    print(Fore.MAGENTA + "=" * 50 + Style.RESET_ALL)
-
-# Kelas Telegram Invite Tool
 class TelegramInviteTool:
     def __init__(self):
         self.accounts = {}
-        self.config_file = 'akun.json'
+        self.config_file = 'accounts.json'
         self.load_accounts()
 
     def load_accounts(self):
@@ -66,14 +59,21 @@ class TelegramInviteTool:
                     print(f"{Fore.RED}Semua field harus diisi!{Style.RESET_ALL}")
                     continue
 
+                # Gunakan nama sesi yang unik
+                session_name = f"sessions/{phone_number}"
+                
                 app = Client(
-                    name=phone_number,
+                    name=session_name,
                     api_id=int(api_id),
                     api_hash=api_hash,
+                    phone_number=phone_number,
                     device_model="iPhone 16 Pro Max",
                     system_version="iOS 18",
                     lang_code="id"
                 )
+
+                # Aktifkan mode sesi permanen
+                app.set_parse_mode("combined")
 
                 await app.start()
 
@@ -90,31 +90,128 @@ class TelegramInviteTool:
                     password = getpass.getpass(f"{Fore.GREEN}Masukkan password 2FA: {Style.RESET_ALL}")
                     await app.check_password(password)
 
-                # Ambil session string
-                session_string = await app.export_session_string()
-                
+                # Simpan sesi dengan metode yang mendukung multi-device
+                await app.storage.save()
+
+                # Ambil informasi pengguna untuk konfirmasi
+                me = await app.get_me()
+                print(f"{Fore.GREEN}✓ Berhasil login sebagai: {me.first_name} {me.last_name or ''}{Style.RESET_ALL}")
+                print(f"{Fore.GREEN}✓ Username: @{me.username}{Style.RESET_ALL}")
+
                 # Simpan informasi akun
                 self.accounts[phone_number] = {
                     'api_id': api_id,
                     'api_hash': api_hash,
-                    'session_string': session_string
+                    'session_name': session_name,
+                    'user_id': me.id
                 }
                 self.save_accounts()
 
-                print(f"{Fore.GREEN}✓ Akun berhasil ditambahkan!{Style.RESET_ALL}")
+                print(f"{Fore.GREEN}✓ Akun berhasil ditambahkan dan sesi disimpan!{Style.RESET_ALL}")
                 break
 
             except errors.PhoneCodeInvalid:
                 print(f"{Fore.RED}✗ Kode OTP tidak valid. Silakan coba lagi.{Style.RESET_ALL}")
             except errors.PhoneCodeExpired:
                 print(f"{Fore.RED}✗ Kode OTP sudah kadaluarsa. Silakan minta ulang.{Style.RESET_ALL}")
-            except errors.BadRequest as e:
-                print(f"{Fore.RED}✗ Kesalahan: {e}{Style.RESET_ALL}")
             except Exception as e:
                 print(f"{Fore.RED}✗ Gagal menambahkan akun: {e}{Style.RESET_ALL}")
             finally:
                 if 'app' in locals():
                     await app.stop()
+
+    async def distribute_invite_tasks(self, source_group, dest_group, total_members):
+        """Distribusikan tugas undangan ke beberapa akun."""
+        if not self.accounts:
+            print(f"{Fore.RED}✗ Tidak ada akun yang tersimpan.{Style.RESET_ALL}")
+            return
+
+        # Hitung pembagian anggota per akun
+        num_accounts = len(self.accounts)
+        members_per_account = total_members // num_accounts
+        extra_members = total_members % num_accounts
+
+        # Simpan hasil invite
+        invite_results = []
+
+        # Proses invite dengan pembagian tugas
+        for idx, (phone, account_info) in enumerate(self.accounts.items()):
+            # Tentukan rentang anggota untuk akun ini
+            start_idx = idx * members_per_account
+            end_idx = start_idx + members_per_account + (extra_members if idx == num_accounts - 1 else 0)
+
+            print(f"\n{Fore.CYAN}[Proses Invite dengan Akun {phone}]{Style.RESET_ALL}")
+            
+            # Buat klien untuk akun ini
+            app = Client(
+                name=account_info['session_name'],
+                api_id=int(account_info['api_id']),
+                api_hash=account_info['api_hash']
+            )
+
+            try:
+                await app.start()
+                
+                # Join grup
+                await app.join_chat(source_group)
+                await app.join_chat(dest_group)
+
+                # Ambil daftar peserta
+                participants = []
+                async for member in app.get_chat_members(source_group):
+                    if not member.user.is_bot and len(participants) < end_idx:
+                        participants.append(member)
+
+                print(f"{Fore.GREEN}✓ {len(participants)} anggota akan diundang.{Style.RESET_ALL}")
+
+                # Proses undangan
+                successful_invites = []
+                failed_invites = []
+
+                for participant in participants[start_idx:end_idx]:
+                    try:
+                        # Tambah anggota
+                        await app.add_chat_members(dest_group, participant.user.id)
+                        successful_invites.append(participant.user.first_name)
+                        
+                        # Tunggu sebentar untuk menghindari flood
+                        await asyncio.sleep(random.uniform(3, 7))
+                    
+                    except errors.FloodWait as e:
+                        print(f"{Fore.YELLOW}FloodWait: Tunggu {e.value} detik.{Style.RESET_ALL}")
+                        await asyncio.sleep(e.value + 10)
+                    except Exception as e:
+                        failed_invites.append((participant.user.first_name, str(e)))
+
+                # Catat hasil
+                invite_results.append({
+                    'akun': phone,
+                    'berhasil': len(successful_invites),
+                    'gagal': len(failed_invites)
+                })
+
+                # Cetak ringkasan per akun
+                print(f"{Fore.GREEN}✓ Berhasil mengundang: {len(successful_invites)}{Style.RESET_ALL}")
+                if failed_invites:
+                    print(f"{Fore.RED}✗ Gagal mengundang: {len(failed_invites)}{Style.RESET_ALL}")
+
+            except Exception as e:
+                print(f"{Fore.RED}Kesalahan pada akun {phone}: {e}{Style.RESET_ALL}")
+            finally:
+                await app.stop()
+
+        # Tampilkan ringkasan akhir
+        print("\n" + "="*50)
+        print(f"{Fore.CYAN}Ringkasan Hasil Invite{Style.RESET_ALL}")
+        total_success = 0
+        total_failed = 0
+        for result in invite_results:
+            print(f"{Fore.YELLOW}{result['akun']}: Berhasil {result['berhasil']}, Gagal {result['gagal']}{Style.RESET_ALL}")
+            total_success += result['berhasil']
+            total_failed += result['gagal']
+        
+        print(f"\n{Fore.GREEN}Total Berhasil: {total_success}{Style.RESET_ALL}")
+        print(f"{Fore.RED}Total Gagal: {total_failed}{Style.RESET_ALL}")
 
     async def invite_members(self):
         """Proses undangan member dari grup target ke grup tujuan."""
@@ -122,102 +219,32 @@ class TelegramInviteTool:
             print(f"{Fore.RED}✗ Tidak ada akun yang tersimpan.{Style.RESET_ALL}")
             return
 
-        # Pilih akun
-        print(f"{Fore.CYAN}[Daftar Akun Tersimpan]{Style.RESET_ALL}")
-        for idx, phone in enumerate(self.accounts.keys(), start=1):
-            print(f"{Fore.YELLOW}{idx}. {phone}{Style.RESET_ALL}")
-
-        try:
-            account_choice = int(input(f"{Fore.GREEN}Pilih akun untuk digunakan: {Style.RESET_ALL}"))
-            selected_phone = list(self.accounts.keys())[account_choice - 1]
-            selected_account = self.accounts[selected_phone]
-        except (ValueError, IndexError):
-            print(f"{Fore.RED}✗ Pilihan akun tidak valid!{Style.RESET_ALL}")
-            return
-
         # Input grup
         source_group = input(f"{Fore.YELLOW}Masukkan username/link grup sumber: {Style.RESET_ALL}")
         dest_group = input(f"{Fore.YELLOW}Masukkan username/link grup tujuan: {Style.RESET_ALL}")
         
         try:
-            max_invites = int(input(f"{Fore.YELLOW}Masukkan jumlah maksimal member untuk diundang: {Style.RESET_ALL}"))
+            max_invites = int(input(f"{Fore.YELLOW}Masukkan jumlah total member untuk diundang: {Style.RESET_ALL}"))
         except ValueError:
             print(f"{Fore.RED}✗ Jumlah undangan harus berupa angka!{Style.RESET_ALL}")
             return
 
-        # Konfigurasi klien
-        app = Client(
-            session_string=selected_account['session_string'],
-            api_id=int(selected_account['api_id']),
-            api_hash=selected_account['api_hash']
-        )
-
-        try:
-            await app.start()
-
-            # Join grup
-            await app.join_chat(source_group)
-            await app.join_chat(dest_group)
-
-            # Ambil peserta grup sumber
-            participants = []
-            async for member in app.get_chat_members(source_group):
-                participants.append(member)
-                if len(participants) >= max_invites:
-                    break
-
-            print(f"{Fore.GREEN}✓ {len(participants)} anggota ditemukan di grup sumber.{Style.RESET_ALL}")
-
-            # Proses undangan
-            invited_count = 0
-            failed_invites = []
-
-            for participant in participants:
-                try:
-                    # Hindari mengundang admin atau bot
-                    if not participant.user.is_bot:
-                        await app.add_chat_members(dest_group, participant.user.id)
-                        invited_count += 1
-                        logging.info(f"✓ {participant.user.first_name} berhasil diundang.")
-                        
-                        # Tambah delay acak untuk menghindari flood
-                        await asyncio.sleep(random.uniform(3, 7))
-                
-                except errors.FloodWait as e:
-                    logging.warning(f"FloodWait: Harus tunggu {e.value} detik.")
-                    await asyncio.sleep(e.value + 10)
-                except errors.UserPrivacyRestricted:
-                    failed_invites.append(participant.user.first_name)
-                    logging.error(f"✗ Tidak dapat mengundang {participant.user.first_name} karena privasi.")
-                except errors.UserNotMutualContact:
-                    failed_invites.append(participant.user.first_name)
-                    logging.error(f"✗ {participant.user.first_name} bukan kontak mutual.")
-                except Exception as e:
-                    failed_invites.append(participant.user.first_name)
-                    logging.error(f"✗ Gagal mengundang {participant.user.first_name}: {e}")
-
-            print(f"{Fore.GREEN}✓ Proses selesai. Total anggota yang berhasil diundang: {invited_count}{Style.RESET_ALL}")
-            
-            if failed_invites:
-                print(f"{Fore.YELLOW}Gagal mengundang ({len(failed_invites)}) anggota:{Style.RESET_ALL}")
-                for name in failed_invites[:10]:  # Tampilkan maks 10 nama
-                    print(f"{Fore.RED}- {name}{Style.RESET_ALL}")
-
-        except Exception as e:
-            print(f"{Fore.RED}✗ Kesalahan umum: {e}{Style.RESET_ALL}")
-        finally:
-            await app.stop()
+        # Mulai proses distribusi undangan
+        await self.distribute_invite_tasks(source_group, dest_group, max_invites)
 
     def main_menu(self):
         """Menu utama."""
         while True:
-            display_banner()
-            print(f"{Fore.GREEN}1. Tambah Akun")
+            print(f"{Fore.CYAN}{'='*50}{Style.RESET_ALL}")
+            print(f"{Fore.GREEN}TELEGRAM MULTI-INVITE TOOL{Style.RESET_ALL}")
+            print(f"{Fore.CYAN}{'='*50}{Style.RESET_ALL}")
+            
+            print(f"{Fore.YELLOW}1. Tambah Akun")
             print("2. Undang Member")
             print("3. Keluar{Style.RESET_ALL}")
             
             try:
-                choice = input(f"{Fore.YELLOW}Pilih menu (1-3): {Style.RESET_ALL}")
+                choice = input(f"{Fore.GREEN}Pilih menu (1-3): {Style.RESET_ALL}")
 
                 if choice == '1':
                     asyncio.run(self.add_account())
@@ -227,12 +254,12 @@ class TelegramInviteTool:
                     break
                 else:
                     print(f"{Fore.RED}Pilihan tidak valid!{Style.RESET_ALL}")
+            
             except KeyboardInterrupt:
                 print(f"\n{Fore.YELLOW}Operasi dibatalkan.{Style.RESET_ALL}")
             except Exception as e:
                 print(f"{Fore.RED}Terjadi kesalahan: {e}{Style.RESET_ALL}")
 
-# Jalankan program
 def main():
     try:
         tool = TelegramInviteTool()
