@@ -3,79 +3,401 @@ import asyncio
 import random
 import sys
 import json
-import getpass
 import logging
 import traceback
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Optional
 
-from aiogram import Bot, Dispatcher, types
-from aiolimiter import AsyncLimiter
+from telethon import TelegramClient
+from telethon.tl.functions.channels import InviteToChannelRequest
+from telethon.tl.types import InputPeerChannel, InputPeerUser
+from telethon.errors import (
+    FloodWaitError, 
+    UserPrivacyRestrictedError, 
+    UserNotMutualContactError, 
+    UserChannelsTooMuchError,
+    ChannelInvalidError
+)
 from colorama import Fore, Style, init
+from aiolimiter import AsyncLimiter
 
-# Konfigurasi Logging & Colorama
+# Enhanced Logging Configuration
 init(autoreset=True)
 logging.basicConfig(
     level=logging.INFO,
-    format=f'{Fore.CYAN}[%(levelname)s]{Style.RESET_ALL} %(message)s',
+    format=f'{Fore.CYAN}[%(asctime)s][%(levelname)s]{Style.RESET_ALL} %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S',
     handlers=[
-        logging.FileHandler("invite_tool_logs.txt"),
+        logging.FileHandler("invite_tool_logs.txt", encoding='utf-8'),
         logging.StreamHandler()
     ]
 )
+logger = logging.getLogger(__name__)
 
-class TelegramInviteTool:
+class TelegramMultiAccountInviteTool:
     def __init__(self):
         self.accounts: Dict[str, Dict] = {}
-        self.config_file = 'accounts.json'
+        self.config_file = 'acc.json'
         self.sessions_dir = 'sessions'
         
-        # Konfigurasi rate limiter
-        self.rate_limiter = AsyncLimiter(3, 10)
+        # More robust rate limiting
+        self.global_rate_limiter = AsyncLimiter(3, 10)  # 3 actions per 10 seconds
         
+        # Create necessary directories
         os.makedirs(self.sessions_dir, exist_ok=True)
         self.load_accounts()
 
     def load_accounts(self):
-        """Muat daftar akun dari file JSON dengan validasi mendalam."""
+        """Enhanced account loading with comprehensive validation."""
         try:
             if os.path.exists(self.config_file):
-                with open(self.config_file, 'r') as f:
-                    self.accounts = json.load(f)
+                with open(self.config_file, 'r', encoding='utf-8') as f:
+                    loaded_accounts = json.load(f)
                 
-                # Validasi setiap sesi
-                self._validate_sessions()
+                # Comprehensive validation
+                validated_accounts = {}
+                for phone, account_data in loaded_accounts.items():
+                    # Check for required keys
+                    required_keys = ['api_id', 'api_hash', 'session_name', 'user_id', 'first_name']
+                    if all(key in account_data for key in required_keys):
+                        validated_accounts[phone] = account_data
+                    else:
+                        logger.warning(f"Skipping invalid account: {phone}")
+                
+                self.accounts = validated_accounts
+                logger.info(f"Loaded {len(self.accounts)} valid accounts")
         except (json.JSONDecodeError, IOError) as e:
-            logging.error(f"Kesalahan memuat akun: {e}")
+            logger.error(f"Error loading accounts: {e}")
             self.accounts = {}
 
-    def _validate_sessions(self):
-        """Validasi dan bersihkan sesi yang tidak valid."""
-        accounts_to_remove = []
-        
-        for phone, account in list(self.accounts.items()):
-            session_path = os.path.join(self.sessions_dir, f"{phone}.session")
-            
-            if not os.path.exists(session_path):
-                logging.warning(f"Sesi untuk {phone} hilang. Menghapus akun.")
-                accounts_to_remove.append(phone)
-        
-        # Hapus akun yang kehilangan sesi
-        for phone in accounts_to_remove:
-            del self.accounts[phone]
-        
-        if accounts_to_remove:
-            self.save_accounts()
-
     def save_accounts(self):
-        """Simpan daftar akun ke file JSON."""
+        """Enhanced account saving with error handling."""
         try:
-            with open(self.config_file, 'w') as f:
-                json.dump(self.accounts, f, indent=4)
+            with open(self.config_file, 'w', encoding='utf-8') as f:
+                json.dump(self.accounts, f, indent=4, ensure_ascii=False)
+            logger.info("Accounts saved successfully")
         except IOError as e:
-            logging.error(f"Gagal menyimpan akun: {e}")
+            logger.error(f"Failed to save accounts: {e}")
+
+    async def add_telegram_account(self):
+        """Enhanced account addition with more robust error handling."""
+        print(f"{Fore.CYAN}[Add Telegram Account]{Style.RESET_ALL}")
+        
+        try:
+            # Collect account details
+            api_id = input(f"{Fore.YELLOW}Enter API ID: {Style.RESET_ALL}")
+            api_hash = input(f"{Fore.YELLOW}Enter API Hash: {Style.RESET_ALL}")
+            phone_number = input(f"{Fore.YELLOW}Enter Phone Number (with country code, e.g., +62xxx): {Style.RESET_ALL}")
+
+            # Validate input
+            if not all([api_id, api_hash, phone_number]):
+                logger.error("All fields are required")
+                print(f"{Fore.RED}✗ All fields are mandatory!{Style.RESET_ALL}")
+                return
+
+            # Prepare session path
+            session_path = os.path.join(self.sessions_dir, phone_number)
+            
+            # Create Telegram client
+            client = TelegramClient(session_path, api_id, api_hash)
+            
+            # Connect and send code
+            await client.connect()
+            send_code_result = await client.send_code_request(phone_number)
+            
+            # Get verification code
+            verification_code = input(f"{Fore.GREEN}Enter OTP Code: {Style.RESET_ALL}")
+            
+            try:
+                await client.sign_in(phone_number, verification_code)
+            except Exception as login_error:
+                logger.error(f"Login failed: {login_error}")
+                print(f"{Fore.RED}✗ Login failed: {login_error}{Style.RESET_ALL}")
+                return
+
+            # Get user information
+            me = await client.get_me()
+            
+            # Store account details
+            self.accounts[phone_number] = {
+                'api_id': str(api_id),
+                'api_hash': api_hash,
+                'session_name': session_path,
+                'user_id': me.id,
+                'username': me.username or 'N/A',
+                'first_name': me.first_name or 'N/A',
+                'last_name': me.last_name or 'N/A'
+            }
+            
+            # Save accounts and close client
+            self.save_accounts()
+            await client.disconnect()
+
+            print(f"{Fore.GREEN}✓ Account {me.first_name} added successfully!{Style.RESET_ALL}")
+        
+        except Exception as e:
+            logger.error(f"Error adding account: {e}")
+            print(f"{Fore.RED}✗ Failed to add account: {e}{Style.RESET_ALL}")
+
+    async def invite_members(self):
+        """Enhanced member invitation with multi-account support."""
+        if not self.accounts:
+            print(f"{Fore.RED}✗ No accounts saved!{Style.RESET_ALL}")
+            return
+
+        # Display and select accounts
+        self.view_accounts()
+        selected_accounts = self._select_accounts()
+
+        if not selected_accounts:
+            print(f"{Fore.RED}✗ No accounts selected!{Style.RESET_ALL}")
+            return
+
+        # Collect invitation details
+        source_group = input(f"{Fore.YELLOW}Enter source group username/link: {Style.RESET_ALL}")
+        dest_group = input(f"{Fore.YELLOW}Enter destination group username/link: {Style.RESET_ALL}")
+        
+        try:
+            max_invites = int(input(f"{Fore.YELLOW}Total number of members to invite: {Style.RESET_ALL}"))
+        except ValueError:
+            print(f"{Fore.RED}✗ Input must be a number!{Style.RESET_ALL}")
+            return
+
+        # Distribute invite tasks across selected accounts
+        invite_tasks = []
+        num_selected_accounts = len(selected_accounts)
+        
+        # Calculate member distribution
+        members_per_account = max_invites // num_selected_accounts
+        extra_members = max_invites % num_selected_accounts
+
+        for idx, phone in enumerate(selected_accounts):
+            account_info = self.accounts[phone]
+            
+            # Calculate start and end indices for member distribution
+            start_idx = idx * members_per_account
+            end_idx = start_idx + members_per_account + (extra_members if idx == num_selected_accounts - 1 else 0)
+            
+            invite_task = self._process_account_invites(
+                account_info, 
+                source_group, 
+                dest_group, 
+                start_idx, 
+                end_idx
+            )
+            invite_tasks.append(invite_task)
+
+        # Run invite tasks concurrently
+        invite_results = await asyncio.gather(*invite_tasks, return_exceptions=True)
+        
+        # Display comprehensive results
+        self._display_invite_summary(selected_accounts, invite_results)
+
+    async def _process_account_invites(
+        self, 
+        account_info: Dict, 
+        source_group: str, 
+        dest_group: str, 
+        start_idx: int, 
+        end_idx: int
+    ) -> Dict:
+        """Process invites for a single account with detailed logging."""
+        logger.info(f"Starting invite process for account: {account_info['first_name']}")
+        
+        async def get_invite_participants(client, source_group):
+            """Helper to fetch participants with error handling."""
+            try:
+                return await client.get_participants(source_group)
+            except Exception as e:
+                logger.error(f"Error fetching participants: {e}")
+                return []
+
+        async def safe_invite_member(client, group, user):
+            """Safely invite a single member with comprehensive error handling."""
+            try:
+                async with self.global_rate_limiter:
+                    await client.send_message(group, '/start')  # Ensure bot interaction
+                    result = await client(InviteToChannelRequest(
+                        channel=group,
+                        users=[user]
+                    ))
+                    return True, None
+            except FloodWaitError as flood:
+                logger.warning(f"Flood wait: {flood.seconds} seconds")
+                return False, f"Flood Wait ({flood.seconds}s)"
+            except (UserPrivacyRestrictedError, UserNotMutualContactError) as privacy_err:
+                return False, str(privacy_err)
+            except UserChannelsTooMuchError:
+                return False, "User in too many channels"
+            except Exception as e:
+                return False, str(e)
+
+        result = {
+            'account_name': account_info['first_name'],
+            'total_attempted': 0,
+            'successful_invites': 0,
+            'failed_invites': 0,
+            'errors': []
+        }
+
+        # Create Telegram client
+        client = TelegramClient(
+            account_info['session_name'], 
+            account_info['api_id'], 
+            account_info['api_hash']
+        )
+
+        try:
+            await client.connect()
+            
+            # Fetch source group participants
+            participants = await get_invite_participants(client, source_group)
+            
+            # Slice participants based on distribution
+            participants_to_invite = participants[start_idx:end_idx]
+            
+            # Invite participants
+            for user in participants_to_invite:
+                result['total_attempted'] += 1
+                
+                invite_success, error_msg = await safe_invite_member(client, dest_group, user)
+                
+                if invite_success:
+                    result['successful_invites'] += 1
+                    logger.info(f"Successfully invited {user.first_name}")
+                else:
+                    result['failed_invites'] += 1
+                    result['errors'].append(f"{user.first_name}: {error_msg}")
+                    logger.warning(f"Failed to invite {user.first_name}: {error_msg}")
+
+                # Random delay to mimic human behavior
+                await asyncio.sleep(random.uniform(3, 7))
+
+        except Exception as e:
+            logger.error(f"Critical error in invite process: {e}")
+            result['errors'].append(str(e))
+        finally:
+            await client.disconnect()
+
+        return result
+
+    def _display_invite_summary(self, accounts, results):
+        """Comprehensive invite summary with detailed logging."""
+        print("\n" + "=" * 50)
+        print(f"{Fore.CYAN}Invite Process Summary{Style.RESET_ALL}")
+
+        total_attempted = 0
+        total_successful = 0
+        total_failed = 0
+
+        for account, result in zip(accounts, results):
+            # Handle potential exceptions in results
+            if isinstance(result, Exception):
+                logger.error(f"Exception in account {account}: {result}")
+                continue
+
+            print(f"\n{Fore.YELLOW}Account: {result['account_name']}{Style.RESET_ALL}")
+            print(f"Total Attempted: {result['total_attempted']}")
+            print(f"Successful Invites: {result['successful_invites']}")
+            print(f"Failed Invites: {result['failed_invites']}")
+
+            total_attempted += result['total_attempted']
+            total_successful += result['successful_invites']
+            total_failed += result['failed_invites']
+
+            # Log detailed errors
+            if result['errors']:
+                print(f"{Fore.RED}Errors:{Style.RESET_ALL}")
+                for error in result['errors'][:10]:  # Limit to first 10 errors
+                    print(f"- {error}")
+
+        print("\n" + "=" * 50)
+        print(f"{Fore.GREEN}Total Attempted: {total_attempted}{Style.RESET_ALL}")
+        print(f"{Fore.GREEN}Total Successful: {total_successful}{Style.RESET_ALL}")
+        print(f"{Fore.RED}Total Failed: {total_failed}{Style.RESET_ALL}")
+
+    def _select_accounts(self) -> List[str]:
+        """Enhanced account selection with comprehensive input handling."""
+        if len(self.accounts) == 1:
+            return list(self.accounts.keys())
+
+        print(f"\n{Fore.CYAN}Select Accounts for Invite Process:{Style.RESET_ALL}")
+        
+        # Display accounts with indices
+        account_list = list(self.accounts.keys())
+        for i, phone in enumerate(account_list, 1):
+            account = self.accounts[phone]
+            print(f"{i}. {phone} - {account['first_name']} {account.get('last_name', '')}")
+        
+        print("\nEnter account numbers (comma-separated)")
+        
+        while True:
+            selections = input(f"{Fore.YELLOW}Your Selection: {Style.RESET_ALL}")
+            
+            try:
+                # Validate and convert selections
+                selected_indices = [int(sel.strip()) for sel in selections.split(',')]
+                
+                # Validate indices
+                if all(1 <= idx <= len(account_list) for idx in selected_indices):
+                    return [account_list[idx-1] for idx in selected_indices]
+                
+                print(f"{Fore.RED}✗ Invalid selection. Please enter valid account numbers.{Style.RESET_ALL}")
+            
+            except ValueError:
+                print(f"{Fore.RED}✗ Invalid input. Please enter numbers separated by commas.{Style.RESET_ALL}")
+
+    def view_accounts(self):
+        """Enhanced account viewing with more details."""
+        if not self.accounts:
+            print(f"{Fore.RED}No accounts saved.{Style.RESET_ALL}")
+            return
+
+        print(f"\n{Fore.CYAN}Saved Telegram Accounts:{Style.RESET_ALL}")
+
+        for phone, account in self.accounts.items():
+            print(f"{Fore.YELLOW}Phone: {phone}")
+            print(f"Name: {account['first_name']} {account.get('last_name', '')}")
+            print(f"Username: {account.get('username', 'N/A')}")
+            print(f"User ID: {account['user_id']}{Style.RESET_ALL}")
+            print("-" * 30)
+
+    def remove_account(self):
+        """Enhanced account removal with comprehensive cleanup."""
+        self.view_accounts()
+        
+        if not self.accounts:
+            return
+
+        phone = input(f"{Fore.YELLOW}Enter phone number of account to remove: {Style.RESET_ALL}")
+
+        if phone in self.accounts:
+            # Attempt to remove session file
+            session_path = self.accounts[phone]['session_name']
+            
+            try:
+                # Remove session file if it exists
+                if os.path.exists(session_path):
+                    os.remove(session_path)
+                    logger.info(f"Session file for {phone} removed")
+
+                # Remove account from dictionary
+                del self.accounts[phone]
+                
+                # Save updated accounts
+                self.save_accounts()
+                
+                print(f"{Fore.GREEN}✓ Account successfully removed!{Style.RESET_ALL}")
+                logger.info(f"Account {phone} removed successfully")
+            
+            except Exception as e:
+                logger.error(f"Error removing account {phone}: {e}")
+                print(f"{Fore.RED}✗ Failed to remove account: {e}{Style.RESET_ALL}")
+
+        else:
+            print(f"{Fore.RED}✗ Account not found!{Style.RESET_ALL}")
 
     def display_banner(self):
-        """Tampilkan banner profesional dan minimalis."""
+        """Display a professional and minimalist banner."""
         os.system('cls' if os.name == 'nt' else 'clear')
         print(Fore.CYAN + r"""
  ╔═╗┬ ┬┌┐┌┌─┐┌─┐┬─┐
@@ -85,292 +407,62 @@ class TelegramInviteTool:
         print(Fore.YELLOW + "Telegram Multi-Account Invite Tool" + Style.RESET_ALL)
         print(Fore.MAGENTA + "=" * 40 + Style.RESET_ALL)
 
-    async def add_account(self):
-        """Tambah akun Telegram dengan metode login aman."""
-        self.display_banner()
-        print(f"{Fore.CYAN}[Tambah Akun Telegram]{Style.RESET_ALL}")
-        
-        try:
-            api_id = input(f"{Fore.YELLOW}Masukkan API ID: {Style.RESET_ALL}")
-            api_hash = input(f"{Fore.YELLOW}Masukkan API Hash: {Style.RESET_ALL}")
-            phone_number = input(f"{Fore.YELLOW}Masukkan Nomor HP (+62xxx): {Style.RESET_ALL}")
-
-            # Validasi input
-            if not all([api_id, api_hash, phone_number]):
-                print(f"{Fore.RED}✗ Semua field wajib diisi!{Style.RESET_ALL}")
-                return
-
-            session_name = os.path.join(self.sessions_dir, phone_number)
-            
-            bot = Bot(token=f'{api_id}:{api_hash}')
-            dp = Dispatcher(bot)
-
-            await bot.start()
-            sent_code = await bot.send_code(phone_number)
-            
-            code = input(f"{Fore.GREEN}Masukkan Kode OTP: {Style.RESET_ALL}")
-            
-            try:
-                await bot.sign_in(phone_number, sent_code.phone_code_hash, code)
-            except Exception as e:
-                logging.error(f"Kesalahan saat masuk: {e}")
-                print(f"{Fore.RED}✗ Gagal masuk: {e}{Style.RESET_ALL}")
-                return
-
-            # Ambil info pengguna
-            me = await bot.get_me()
-            
-            # Simpan informasi akun
-            self.accounts[phone_number] = {
-                'api_id': api_id,
-                'api_hash': api_hash,
-                'session_name': session_name,
-                'user_id': me.id,
-                'username': me.username or 'Tidak ada',
-                'first_name': me.first_name,
-                'last_name': me.last_name or 'Tidak ada'
-            }
-            self.save_accounts()
-
-            print(f"{Fore.GREEN}✓ Akun {me.first_name} berhasil ditambahkan!{Style.RESET_ALL}")
-        
-        except Exception as e:
-            logging.error(f"Kesalahan menambah akun: {e}")
-            print(f"{Fore.RED}✗ Gagal menambah akun: {e}{Style.RESET_ALL}")
-        
-    async def invite_members(self):
-        """Proses undangan member dengan pilihan akun lebih fleksibel."""
-        if not self.accounts:
-            print(f"{Fore.RED}✗ Tidak ada akun tersimpan!{Style.RESET_ALL}")
-            return
-
-        # Tampilkan daftar akun untuk dipilih
-        self.view_accounts()
-        selected_accounts = self._select_accounts()
-
-        if not selected_accounts:
-            print(f"{Fore.RED}✗ Tidak ada akun yang dipilih!{Style.RESET_ALL}")
-            return
-
-        # Input detail grup
-        source_group = input(f"{Fore.YELLOW}Masukkan username/link grup sumber: {Style.RESET_ALL}")
-        dest_group = input(f"{Fore.YELLOW}Masukkan username/link grup tujuan: {Style.RESET_ALL}")
-        
-        try:
-            max_invites = int(input(f"{Fore.YELLOW}Jumlah total member untuk diundang: {Style.RESET_ALL}"))
-        except ValueError:
-            print(f"{Fore.RED}✗ Input harus angka!{Style.RESET_ALL}")
-            return
-
-        # Distribusi tugas antar akun terpilih
-        temporary_accounts = {phone: self.accounts[phone] for phone in selected_accounts}
-        
-        try:
-            invite_results = await self._distribute_invite_tasks(source_group, dest_group, max_invites)
-            
-            # Tampilkan ringkasan
-            self._display_invite_summary(invite_results)
-        
-        finally:
-            pass  # Kembalikan akun asli jika diperlukan
-
-    def _select_accounts(self) -> List[str]:
-        """Memungkinkan pemilihan akun secara fleksibel."""
-        if len(self.accounts) == 1:
-            return list(self.accounts.keys())
-
-        print(f"\n{Fore.CYAN}Pilih Akun untuk Proses Invite:{Style.RESET_ALL}")
-        
-        for i, (phone, account) in enumerate(self.accounts.items(), 1):
-            print(f"{i}. {phone} - {account['first_name']} {account['last_name']}")
-        
-        print("\nMasukkan nomor akun (pisahkan dengan koma jika lebih dari satu)")
-        
-        selections = input(f"{Fore.YELLOW}Pilihan Anda: {Style.RESET_ALL}")
-        
-        selected_accounts = []
-        
-        try:
-            for sel in selections.split(','):
-                idx = int(sel.strip()) - 1
-                phone = list(self.accounts.keys())[idx]
-                selected_accounts.append(phone)
-                
-        except (ValueError, IndexError):
-            print(f"{Fore.RED}✗ Pilihan tidak valid!{Style.RESET_ALL}")
-        
-        return selected_accounts
-
-    async def _distribute_invite_tasks(self, source_group: str, dest_group: str, total_members: int) -> List[Dict]:
-        """Distribusikan tugas undangan ke beberapa akun."""
-        
-        num_accounts = len(self.accounts)
-        
-        members_per_account = total_members // num_accounts
-        
-        extra_members = total_members % num_accounts
-        
-        invite_results = []
-
-        for idx, (phone, account_info) in enumerate(self.accounts.items()):
-            
-            start_idx = idx * members_per_account
-            
-            end_idx = start_idx + members_per_account + (extra_members if idx == num_accounts - 1 else 0)
-
-            print(f"\n{Fore.CYAN}[Proses Invite dengan Akun {phone}]{Style.RESET_ALL}")
-
-            bot = Bot(token=f'{account_info["api_id"]}:{account_info["api_hash"]}')
-            
-            try:
-                await bot.start()
-                
-                # Ambil peserta dari grup sumber 
-                participants = await bot.get_chat_members(source_group)
-
-                # Proses undangan 
-                result = await self._process_invites(bot, dest_group, participants[start_idx:end_idx])
-                
-                invite_results.append({
-                    'akun': phone,
-                    **result
-                })
-
-            except Exception as e:
-                logging.error(f"Kesalahan pada akun {phone}: {e}")
-                print(f"{Fore.RED}Kesalahan pada akun {phone}: {e}{Style.RESET_ALL}")
-
-            finally:
-                await bot.close()
-
-        return invite_results
-
-    async def _process_invites(self, bot: Bot, dest_group: str, participants: List[types.ChatMember]) -> Dict:
-         """Proses undangan dengan penanganan flood dan rate limiting."""
-         
-         successful_invites = []
-         failed_invites = []
-
-         for participant in participants:
-
-             async with self.rate_limiter:  # Gunakan rate limiter
-                 try:
-                     await bot.add_chat_members(dest_group, participant.user.id)
-                     successful_invites.append(participant.user.first_name)
-                     await asyncio.sleep(random.uniform(3, 7))
-                 
-                 except Exception as e:
-                     failed_invites.append((participant.user.first_name, str(e)))
-
-         return {
-             'berhasil': len(successful_invites),
-             'gagal': len(failed_invites)
-         }
-
-    def _display_invite_summary(self, invite_results: List[Dict]):
-         """Tampilkan ringkasan hasil invite."""
-         print("\n" + "="*50)
-         print(f"{Fore.CYAN}Ringkasan Hasil Invite{Style.RESET_ALL}")
-
-         total_success = 0
-         total_failed = 0
-
-         for result in invite_results:
-             print(f"{Fore.YELLOW}{result['akun']}: Berhasil {result['berhasil']}, Gagal {result.get('gagal', 0)}{Style.RESET_ALL}")
-             total_success += result['berhasil']
-             total_failed += result.get('gagal', 0)
-
-         print(f"\n{Fore.GREEN}Total Berhasil: {total_success}{Style.RESET_ALL}")
-         print(f"{Fore.RED}Total Gagal: {total_failed}{Style.RESET_ALL}")
-
-    def view_accounts(self):
-         """Tampilkan daftar akun tersimpan."""
-         if not self.accounts:
-             print(f"{Fore.RED}Tidak ada akun tersimpan.{Style.RESET_ALL}")
-             return
-
-         print(f"\n{Fore.CYAN}Daftar Akun Tersimpan:{Style.RESET_ALL}")
-
-         for phone, account in self.accounts.items():
-             print(f"{Fore.YELLOW}Nomor: {phone}")
-             print(f"Nama: {account['first_name']} {account['last_name']}")
-             print(f"Username: {account['username']}")
-             print(f"User ID: {account['user_id']}{Style.RESET_ALL}")
-             print("-" * 30)
-
-    def remove_account(self):
-         """Hapus akun dari daftar."""
-         self.view_accounts()
-         
-         if not self.accounts:
-             return
-
-         phone = input(f"{Fore.YELLOW}Masukkan nomor HP akun yang akan dihapus: {Style.RESET_ALL}")
-
-         if phone in self.accounts:
-             # Hapus file sesi 
-             session_path = os.path.join(self.sessions_dir, f"{phone}.session")
-             
-             if os.path.exists(session_path):
-                 os.remove(session_path)
-
-             # Hapus dari data akun 
-             del self.accounts[phone]
-             
-             self.save_accounts()
-             
-             print(f"{Fore.GREEN}✓ Akun berhasil dihapus!{Style.RESET_ALL}")
-
-         else:
-             print(f"{Fore.RED}✗ Akun tidak ditemukan!{Style.RESET_ALL}")
-
     def main_menu(self):
-         """Menu utama dengan opsi tambahan"""
-         
-         while True:
-             self.display_banner()
-             
-             print(f"{Fore.GREEN}1. Tambah Akun Telegram")
-             print("2. Undang Member Grup")
-             print("3. Lihat Daftar Akun")
-             print("4. Hapus Akun")
-             print("5. Keluar{Style.RESET_ALL}")
+        """Enhanced main menu with robust error handling."""
+        while True:
+            try:
+                # Clear screen and display banner
+                self.display_banner()
+                
+                # Menu options
+                print(f"{Fore.GREEN}1. Add Telegram Account")
+                print("2. Invite Group Members")
+                print("3. View Saved Accounts")
+                print("4. Remove Account")
+                print("5. Exit{Style.RESET_ALL}")
 
-             choice = input(f"{Fore.YELLOW}Pilih Menu (1-5): {Style.RESET_ALL}")
+                # Get user choice
+                choice = input(f"{Fore.YELLOW}Select Menu Option (1-5): {Style.RESET_ALL}")
 
-             try:
-                 if choice == '1':
-                     asyncio.run(self.add_account())
-                 elif choice == '2':
-                     asyncio.run(self.invite_members())
-                 elif choice == '3':
-                     self.view_accounts()
-                 elif choice == '4':
-                     self.remove_account()
-                 elif choice == '5':
-                     print(f"{Fore.CYAN}Terima kasih!{Style.RESET_ALL}")
-                     break
-                 else:
-                     print(f"{Fore.RED}Pilihan tidak valid!{Style.RESET_ALL}")
+                # Process choice
+                if choice == '1':
+                    asyncio.run(self.add_telegram_account())
+                elif choice == '2':
+                    asyncio.run(self.invite_members())
+                elif choice == '3':
+                    self.view_accounts()
+                elif choice == '4':
+                    self.remove_account()
+                elif choice == '5':
+                    print(f"{Fore.CYAN}Thank you for using Telegram Invite Tool!{Style.RESET_ALL}")
+                    break
+                else:
+                    print(f"{Fore.RED}Invalid option! Please select 1-5.{Style.RESET_ALL}")
 
-             except Exception as e:
-                 logging.error(e)
-                 print(f"{Fore.RED}Kesalahan: {e}{Style.RESET_ALL}")
+            except KeyboardInterrupt:
+                print(f"\n{Fore.CYAN}Operation cancelled by user.{Style.RESET_ALL}")
+                break
+            except Exception as e:
+                logger.error(f"Unexpected error in main menu: {e}")
+                print(f"{Fore.RED}An unexpected error occurred: {e}{Style.RESET_ALL}")
 
-             input("\nTekan Enter untuk melanjutkan...")
+            # Pause before next iteration
+            input("\nPress Enter to continue...")
 
 def main():
+    """Main entry point for the Telegram Invite Tool."""
     try:
-        tool = TelegramInviteTool()
-        print(f"Instance Tool: {tool}")  # Output debugging
-        print(f"Metode yang Tersedia: {dir(tool)}")  # Daftar metode
+        # Set up global exception handling
+        tool = TelegramMultiAccountInviteTool()
         tool.main_menu()
     except KeyboardInterrupt:
-        print(f"\n{Fore.CYAN}Operasi dibatalkan.{Style.RESET_ALL}")
+        print(f"\n{Fore.CYAN}Operation cancelled.{Style.RESET_ALL}")
     except Exception as e:
-        logging.error(traceback.format_exc())
-        print(f"{Fore.RED}Kesalahan fatal: {e}{Style.RESET_ALL}")
+        # Log detailed traceback
+        logger.error(f"Critical error: {traceback.format_exc()}")
+        print(f"{Fore.RED}A critical error occurred: {e}{Style.RESET_ALL}")
         sys.exit(1)
 
+# Ensure the script can be run directly
 if __name__ == "__main__":
-     main()
+    main()
