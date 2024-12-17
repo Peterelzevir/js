@@ -453,7 +453,7 @@ def main():
     """Main entry point for the Telegram Invite Tool."""
     try:
         # Set up global exception handling
-        tool = TelegramMultiAccountInviteTool()
+        tool = TelegramMultiAccountInviteTool()  # Make sure this matches the class name
         tool.main_menu()
     except KeyboardInterrupt:
         print(f"\n{Fore.CYAN}Operation cancelled.{Style.RESET_ALL}")
