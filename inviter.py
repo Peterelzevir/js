@@ -415,7 +415,6 @@ async def add_telegram_account(self):
             print(f"{Fore.RED}✗ Account not found!{Style.RESET_ALL}")
 
     def main():
-    """Main entry point for the Telegram Invite Tool."""
     try:
         # Initialize the tool
         tool = TelegramInviteTool()
