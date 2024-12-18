@@ -33,6 +33,51 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+class TelegramInviteTool:
+    def __init__(self):
+        self.accounts: Dict[str, Dict] = {}
+        self.config_file = 'acc.json'
+        self.sessions_dir = 'sessiond'
+        
+        # More robust rate limiting
+        self.global_rate_limiter = AsyncLimiter(3, 10)  # 3 actions per 10 seconds
+        
+        # Create necessary directories
+        os.makedirs(self.sessions_dir, exist_ok=True)
+        self.load_accounts()
+
+    def load_accounts(self):
+        """Enhanced account loading with comprehensive validation."""
+        try:
+            if os.path.exists(self.config_file):
+                with open(self.config_file, 'r', encoding='utf-8') as f:
+                    loaded_accounts = json.load(f)
+                
+                # Comprehensive validation
+                validated_accounts = {}
+                for phone, account_data in loaded_accounts.items():
+                    # Check for required keys
+                    required_keys = ['api_id', 'api_hash', 'session_name', 'user_id', 'first_name']
+                    if all(key in account_data for key in required_keys):
+                        validated_accounts[phone] = account_data
+                    else:
+                        logger.warning(f"Skipping invalid account: {phone}")
+                
+                self.accounts = validated_accounts
+                logger.info(f"Loaded {len(self.accounts)} valid accounts")
+        except (json.JSONDecodeError, IOError) as e:
+            logger.error(f"Error loading accounts: {e}")
+            self.accounts = {}
+
+    def save_accounts(self):
+        """Enhanced account saving with error handling."""
+        try:
+            with open(self.config_file, 'w', encoding='utf-8') as f:
+                json.dump(self.accounts, f, indent=4, ensure_ascii=False)
+            logger.info("Accounts saved successfully")
+        except IOError as e:
+            logger.error(f"Failed to save accounts: {e}")
+
 async def add_telegram_account(self):
     """Enhanced account addition with more robust error handling."""
     print(f"{Fore.CYAN}[Add Telegram Account]{Style.RESET_ALL}")
@@ -379,51 +424,6 @@ async def add_telegram_account(self):
         """ + Style.RESET_ALL)
         print(Fore.YELLOW + "Telegram Multi-Account Invite Tool" + Style.RESET_ALL)
         print(Fore.MAGENTA + "=" * 40 + Style.RESET_ALL)
-
-class TelegramInviteTool:
-    def __init__(self):
-        self.accounts: Dict[str, Dict] = {}
-        self.config_file = 'acc.json'
-        self.sessions_dir = 'sessiond'
-        
-        # More robust rate limiting
-        self.global_rate_limiter = AsyncLimiter(3, 10)  # 3 actions per 10 seconds
-        
-        # Create necessary directories
-        os.makedirs(self.sessions_dir, exist_ok=True)
-        self.load_accounts()
-
-    def load_accounts(self):
-        """Enhanced account loading with comprehensive validation."""
-        try:
-            if os.path.exists(self.config_file):
-                with open(self.config_file, 'r', encoding='utf-8') as f:
-                    loaded_accounts = json.load(f)
-                
-                # Comprehensive validation
-                validated_accounts = {}
-                for phone, account_data in loaded_accounts.items():
-                    # Check for required keys
-                    required_keys = ['api_id', 'api_hash', 'session_name', 'user_id', 'first_name']
-                    if all(key in account_data for key in required_keys):
-                        validated_accounts[phone] = account_data
-                    else:
-                        logger.warning(f"Skipping invalid account: {phone}")
-                
-                self.accounts = validated_accounts
-                logger.info(f"Loaded {len(self.accounts)} valid accounts")
-        except (json.JSONDecodeError, IOError) as e:
-            logger.error(f"Error loading accounts: {e}")
-            self.accounts = {}
-
-    def save_accounts(self):
-        """Enhanced account saving with error handling."""
-        try:
-            with open(self.config_file, 'w', encoding='utf-8') as f:
-                json.dump(self.accounts, f, indent=4, ensure_ascii=False)
-            logger.info("Accounts saved successfully")
-        except IOError as e:
-            logger.error(f"Failed to save accounts: {e}")
             
     def main_menu(self):
         """Enhanced main menu with robust error handling."""
