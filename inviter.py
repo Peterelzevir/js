@@ -414,22 +414,6 @@ async def add_telegram_account(self):
         else:
             print(f"{Fore.RED}✗ Account not found!{Style.RESET_ALL}")
 
-    def main():
-    try:
-        # Initialize the tool
-        tool = TelegramInviteTool()
-
-        # Start the main menu
-        tool.main_menu()
-
-    except KeyboardInterrupt:
-        print(f"\n{Fore.CYAN}Operation cancelled by user. Exiting program.{Style.RESET_ALL}")
-    except Exception as e:
-        # Log detailed traceback for critical errors
-        logger.error(f"Critical error: {traceback.format_exc()}")
-        print(f"{Fore.RED}✗ A critical error occurred: {e}{Style.RESET_ALL}")
-        sys.exit(1)
-
     def display_banner(self):
         """Display a professional and minimalist banner."""
         os.system('cls' if os.name == 'nt' else 'clear')
@@ -440,7 +424,7 @@ async def add_telegram_account(self):
         """ + Style.RESET_ALL)
         print(Fore.YELLOW + "Telegram Multi-Account Invite Tool" + Style.RESET_ALL)
         print(Fore.MAGENTA + "=" * 40 + Style.RESET_ALL)
-            
+
     def main_menu(self):
         """Enhanced main menu with robust error handling."""
         while True:
@@ -483,6 +467,24 @@ async def add_telegram_account(self):
 
             # Pause before next iteration
             input(f"\n{Fore.YELLOW}Press Enter to return to the main menu...{Style.RESET_ALL}")
+
+
+    def main():
+    """Main entry point for the Telegram Invite Tool."""
+    try:
+        # Initialize the tool
+        tool = TelegramInviteTool()
+
+        # Start the main menu
+        tool.main_menu()
+
+    except KeyboardInterrupt:
+        print(f"\n{Fore.CYAN}Operation cancelled by user. Exiting program.{Style.RESET_ALL}")
+    except Exception as e:
+        # Log detailed traceback for critical errors
+        logger.error(f"Critical error: {traceback.format_exc()}")
+        print(f"{Fore.RED}✗ A critical error occurred: {e}{Style.RESET_ALL}")
+        sys.exit(1)
 
 # Ensure the script can be run directly
 if __name__ == "__main__":
