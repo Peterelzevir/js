@@ -367,7 +367,6 @@ class TelegramMultiAccountInviteTool:
         
         if not self.accounts:
             return
-
         phone = input(f"{Fore.YELLOW}Enter phone number of account to remove: {Style.RESET_ALL}")
 
         if phone in self.accounts:
