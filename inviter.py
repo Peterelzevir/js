@@ -33,19 +33,6 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-class TelegramInviteTool:
-    def __init__(self):
-        self.accounts: Dict[str, Dict] = {}
-        self.config_file = 'acc.json'
-        self.sessions_dir = 'sessiond'
-        
-        # More robust rate limiting
-        self.global_rate_limiter = AsyncLimiter(3, 10)  # 3 actions per 10 seconds
-        
-        # Create necessary directories
-        os.makedirs(self.sessions_dir, exist_ok=True)
-        self.load_accounts()
-
     def load_accounts(self):
         """Enhanced account loading with comprehensive validation."""
         try:
@@ -425,48 +412,61 @@ async def add_telegram_account(self):
         print(Fore.YELLOW + "Telegram Multi-Account Invite Tool" + Style.RESET_ALL)
         print(Fore.MAGENTA + "=" * 40 + Style.RESET_ALL)
 
-def main_menu(self):
-    """Enhanced main menu with robust error handling."""
-    while True:
-        try:
-            # Clear screen and display banner
-            self.display_banner()
+class TelegramInviteTool:
+    def __init__(self):
+        self.accounts: Dict[str, Dict] = {}
+        self.config_file = 'acc.json'
+        self.sessions_dir = 'sessiond'
+        
+        # More robust rate limiting
+        self.global_rate_limiter = AsyncLimiter(3, 10)  # 3 actions per 10 seconds
+        
+        # Create necessary directories
+        os.makedirs(self.sessions_dir, exist_ok=True)
+        self.load_accounts()
 
-            # Menu options
-            print(f"""
+    def main_menu(self):
+        """Enhanced main menu with robust error handling."""
+        while True:
+            try:
+                # Clear screen and display banner
+                self.display_banner()
+
+                # Menu options
+                print(f"""
 {Fore.GREEN}1. Add Telegram Account{Style.RESET_ALL}
 {Fore.GREEN}2. Invite Group Members{Style.RESET_ALL}
 {Fore.GREEN}3. View Saved Accounts{Style.RESET_ALL}
 {Fore.GREEN}4. Remove Account{Style.RESET_ALL}
 {Fore.GREEN}5. Exit{Style.RESET_ALL}
-            """)
+                """)
 
-            # Get user choice
-            choice = input(f"{Fore.YELLOW}Select Menu Option (1-5): {Style.RESET_ALL}").strip()
+                # Get user choice
+                choice = input(f"{Fore.YELLOW}Select Menu Option (1-5): {Style.RESET_ALL}").strip()
 
-            # Process choice
-            if choice == '1':
-                asyncio.run(self.add_telegram_account())
-            elif choice == '2':
-                asyncio.run(self.invite_members())
-            elif choice == '3':
-                self.view_accounts()
-            elif choice == '4':
-                self.remove_account()
-            elif choice == '5':
-                print(f"{Fore.CYAN}Thank you for using Telegram Invite Tool! Goodbye.{Style.RESET_ALL}")
-                break
-            else:
-                print(f"{Fore.RED}✗ Invalid option! Please select a number between 1 and 5.{Style.RESET_ALL}")
+                # Process choice
+                if choice == '1':
+                    asyncio.run(self.add_telegram_account())
+                elif choice == '2':
+                    asyncio.run(self.invite_members())
+                elif choice == '3':
+                    self.view_accounts()
+                elif choice == '4':
+                    self.remove_account()
+                elif choice == '5':
+                    print(f"{Fore.CYAN}Thank you for using Telegram Invite Tool! Goodbye.{Style.RESET_ALL}")
+                    break
+                else:
+                    print(f"{Fore.RED}✗ Invalid option! Please select a number between 1 and 5.{Style.RESET_ALL}")
 
-        except KeyboardInterrupt:
-            print(f"\n{Fore.CYAN}Operation cancelled by user. Returning to menu.{Style.RESET_ALL}")
-        except Exception as e:
-            logger.error(f"Unexpected error in main menu: {e}")
-            print(f"{Fore.RED}✗ An unexpected error occurred: {e}{Style.RESET_ALL}")
+            except KeyboardInterrupt:
+                print(f"\n{Fore.CYAN}Operation cancelled by user. Returning to menu.{Style.RESET_ALL}")
+            except Exception as e:
+                logger.error(f"Unexpected error in main menu: {e}")
+                print(f"{Fore.RED}✗ An unexpected error occurred: {e}{Style.RESET_ALL}")
 
-        # Pause before next iteration
-        input(f"\n{Fore.YELLOW}Press Enter to return to the main menu...{Style.RESET_ALL}")
+            # Pause before next iteration
+            input(f"\n{Fore.YELLOW}Press Enter to return to the main menu...{Style.RESET_ALL}")
 
 
 def main():
@@ -485,7 +485,6 @@ def main():
         logger.error(f"Critical error: {traceback.format_exc()}")
         print(f"{Fore.RED}✗ A critical error occurred: {e}{Style.RESET_ALL}")
         sys.exit(1)
-
 # Ensure the script can be run directly
 if __name__ == "__main__":
     main()
