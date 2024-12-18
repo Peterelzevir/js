@@ -33,7 +33,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-class TelegramMultiAccountInviteTool:
+class TelegramInviteTool:
     def __init__(self):
         self.accounts: Dict[str, Dict] = {}
         self.config_file = 'acc.json'
@@ -452,7 +452,7 @@ def main():
     """Main entry point for the Telegram Invite Tool."""
     try:
         # Set up global exception handling
-        tool = TelegramMultiAccountInviteTool()  # Make sure this matches the class name
+        tool = TelegramInviteTool()  # Make sure this matches the class name
         tool.main_menu()
     except KeyboardInterrupt:
         print(f"\n{Fore.CYAN}Operation cancelled.{Style.RESET_ALL}")
