@@ -46,6 +46,23 @@ class TelegramInvite:
         os.makedirs(self.sessions_dir, exist_ok=True)
         self.load_accounts()
 
+    def main():
+    """Main entry point for the Telegram Invite Tool."""
+    try:
+        # Initialize tool
+        tool = TelegramInvite()
+
+        # Run main menu
+        tool.main_menu()
+
+    except KeyboardInterrupt:
+        print(f"\n{Fore.CYAN}Operation cancelled by user. Exiting program.{Style.RESET_ALL}")
+    except Exception as e:
+        # Log critical errors with traceback
+        logger.error(f"Critical error: {traceback.format_exc()}")
+        print(f"{Fore.RED}✗ A critical error occurred: {e}{Style.RESET_ALL}")
+        sys.exit(1)
+        
     def load_accounts(self):
         """Enhanced account loading with comprehensive validation."""
         try:
@@ -417,23 +434,6 @@ async def add_telegram_account(self):
             
             except ValueError:
                 print(f"{Fore.RED}✗ Invalid input. Please enter numbers separated by commas.{Style.RESET_ALL}")
-
-    def main():
-    """Main entry point for the Telegram Invite Tool."""
-    try:
-        # Initialize tool
-        tool = TelegramInvite()
-
-        # Run main menu
-        tool.main_menu()
-
-    except KeyboardInterrupt:
-        print(f"\n{Fore.CYAN}Operation cancelled by user. Exiting program.{Style.RESET_ALL}")
-    except Exception as e:
-        # Log critical errors with traceback
-        logger.error(f"Critical error: {traceback.format_exc()}")
-        print(f"{Fore.RED}✗ A critical error occurred: {e}{Style.RESET_ALL}")
-        sys.exit(1)
 
     def view_accounts(self):
         """Enhanced account viewing with more details."""
