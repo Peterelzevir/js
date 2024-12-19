@@ -469,21 +469,21 @@ async def add_telegram_account(self):
             input(f"\n{Fore.YELLOW}Press Enter to return to the main menu...{Style.RESET_ALL}")
 
 
-    def main():
+def main():
     """Main entry point for the Telegram Invite Tool."""
     try:
-        # Inisialisasi alat
+        # Initialize tool
         tool = TelegramInviteTool()
 
-        # Jalankan menu utama
+        # Run main menu
         tool.main_menu()
 
     except KeyboardInterrupt:
-        print(f"\n{Fore.CYAN}Operasi dibatalkan oleh pengguna. Keluar dari program.{Style.RESET_ALL}")
+        print(f"\n{Fore.CYAN}Operation cancelled by user. Exiting program.{Style.RESET_ALL}")
     except Exception as e:
-        # Log kesalahan dengan traceback untuk error kritis
-        logger.error(f"Kesalahan kritis: {traceback.format_exc()}")
-        print(f"{Fore.RED}✗ Terjadi kesalahan kritis: {e}{Style.RESET_ALL}")
+        # Log critical errors with traceback
+        logger.error(f"Critical error: {traceback.format_exc()}")
+        print(f"{Fore.RED}✗ A critical error occurred: {e}{Style.RESET_ALL}")
         sys.exit(1)
 
 # Ensure the script can be run directly
