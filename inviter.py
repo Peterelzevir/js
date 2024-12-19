@@ -6,7 +6,6 @@ import json
 import logging
 import traceback
 from typing import Dict, List, Tuple, Optional
-
 from telethon import TelegramClient
 from telethon.tl.functions.channels import InviteToChannelRequest
 from telethon.tl.types import InputPeerChannel, InputPeerUser
@@ -45,23 +44,6 @@ class TelegramInvite:
         # Create necessary directories
         os.makedirs(self.sessions_dir, exist_ok=True)
         self.load_accounts()
-
-    def main():
-    """Main entry point for the Telegram Invite Tool."""
-    try:
-        # Initialize tool
-        tool = TelegramInvite()
-
-        # Run main menu
-        tool.main_menu()
-
-    except KeyboardInterrupt:
-        print(f"\n{Fore.CYAN}Operation cancelled by user. Exiting program.{Style.RESET_ALL}")
-    except Exception as e:
-        # Log critical errors with traceback
-        logger.error(f"Critical error: {traceback.format_exc()}")
-        print(f"{Fore.RED}✗ A critical error occurred: {e}{Style.RESET_ALL}")
-        sys.exit(1)
         
     def load_accounts(self):
         """Enhanced account loading with comprehensive validation."""
@@ -148,6 +130,23 @@ class TelegramInvite:
 
             # Pause before next iteration
             input(f"\n{Fore.YELLOW}Press Enter to return to the main menu...{Style.RESET_ALL}")
+
+def main():
+    """Main entry point for the Telegram Invite Tool."""
+    try:
+        # Initialize tool
+        tool = TelegramInvite()
+
+        # Run main menu
+        tool.main_menu()
+
+    except KeyboardInterrupt:
+        print(f"\n{Fore.CYAN}Operation cancelled by user. Exiting program.{Style.RESET_ALL}")
+    except Exception as e:
+        # Log critical errors with traceback
+        logger.error(f"Critical error: {traceback.format_exc()}")
+        print(f"{Fore.RED}✗ A critical error occurred: {e}{Style.RESET_ALL}")
+        sys.exit(1)
 
 async def add_telegram_account(self):
     """Enhanced account addition with more robust error handling."""
