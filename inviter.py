@@ -131,56 +131,6 @@ class TelegramInvite:
             # Pause before next iteration
             input(f"\n{Fore.YELLOW}Press Enter to return to the main menu...{Style.RESET_ALL}")
 
-    def view_accounts(self):
-        """Enhanced account viewing with more details."""
-        if not self.accounts:
-            print(f"{Fore.RED}No accounts saved.{Style.RESET_ALL}")
-            return
-
-        print(f"\n{Fore.CYAN}Saved Telegram Accounts:{Style.RESET_ALL}")
-
-        for phone, account in self.accounts.items():
-            print(f"{Fore.YELLOW}Phone: {phone}")
-            print(f"Name: {account['first_name']} {account.get('last_name', '')}")
-            print(f"Username: {account.get('username', 'N/A')}")
-            print(f"User ID: {account['user_id']}{Style.RESET_ALL}")
-            print("-" * 30)
-
-    def remove_account(self):
-        """Enhanced account removal with comprehensive cleanup."""
-        self.view_accounts()
-        
-        if not self.accounts:
-            return
-
-        phone = input(f"{Fore.YELLOW}Enter phone number of account to remove: {Style.RESET_ALL}")
-
-        if phone in self.accounts:
-            # Attempt to remove session file
-            session_path = self.accounts[phone]['session_name']
-            
-            try:
-                # Remove session file if it exists
-                if os.path.exists(session_path):
-                    os.remove(session_path)
-                    logger.info(f"Session file for {phone} removed")
-
-                # Remove account from dictionary
-                del self.accounts[phone]
-                
-                # Save updated accounts
-                self.save_accounts()
-                
-                print(f"{Fore.GREEN}✓ Account successfully removed!{Style.RESET_ALL}")
-                logger.info(f"Account {phone} removed successfully")
-            
-            except Exception as e:
-                logger.error(f"Error removing account {phone}: {e}")
-                print(f"{Fore.RED}✗ Failed to remove account: {e}{Style.RESET_ALL}")
-
-        else:
-            print(f"{Fore.RED}✗ Account not found!{Style.RESET_ALL}")
-
 async def add_telegram_account(self):
     """Enhanced account addition with more robust error handling."""
     print(f"{Fore.CYAN}[Add Telegram Account]{Style.RESET_ALL}")
@@ -466,6 +416,57 @@ async def add_telegram_account(self):
             
             except ValueError:
                 print(f"{Fore.RED}✗ Invalid input. Please enter numbers separated by commas.{Style.RESET_ALL}")
+
+    def view_accounts(self):
+        """Enhanced account viewing with more details."""
+        if not self.accounts:
+            print(f"{Fore.RED}No accounts saved.{Style.RESET_ALL}")
+            return
+
+        print(f"\n{Fore.CYAN}Saved Telegram Accounts:{Style.RESET_ALL}")
+
+        for phone, account in self.accounts.items():
+            print(f"{Fore.YELLOW}Phone: {phone}")
+            print(f"Name: {account['first_name']} {account.get('last_name', '')}")
+            print(f"Username: {account.get('username', 'N/A')}")
+            print(f"User ID: {account['user_id']}{Style.RESET_ALL}")
+            print("-" * 30)
+
+    def remove_account(self):
+        """Enhanced account removal with comprehensive cleanup."""
+        self.view_accounts()
+        
+        if not self.accounts:
+            return
+
+        phone = input(f"{Fore.YELLOW}Enter phone number of account to remove: {Style.RESET_ALL}")
+
+        if phone in self.accounts:
+            # Attempt to remove session file
+            session_path = self.accounts[phone]['session_name']
+            
+            try:
+                # Remove session file if it exists
+                if os.path.exists(session_path):
+                    os.remove(session_path)
+                    logger.info(f"Session file for {phone} removed")
+
+                # Remove account from dictionary
+                del self.accounts[phone]
+                
+                # Save updated accounts
+                self.save_accounts()
+                
+                print(f"{Fore.GREEN}✓ Account successfully removed!{Style.RESET_ALL}")
+                logger.info(f"Account {phone} removed successfully")
+            
+            except Exception as e:
+                logger.error(f"Error removing account {phone}: {e}")
+                print(f"{Fore.RED}✗ Failed to remove account: {e}{Style.RESET_ALL}")
+
+        else:
+            print(f"{Fore.RED}✗ Account not found!{Style.RESET_ALL}")
+
 
 def main():
     """Main entry point for the Telegram Invite Tool."""
