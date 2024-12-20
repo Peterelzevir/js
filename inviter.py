@@ -170,9 +170,7 @@ class TelegramInvite:
 
             try:
                 await client.sign_in(phone_number, verification_code)
-            except Exception as login_error:
-            # Handle if password is required
-            if 'password' in str(login_error).lower():
+            except SessionPasswordNeededError:
                 password = input(f"{Fore.YELLOW}Enter your password: {Style.RESET_ALL}")
                 try:
                     await client.sign_in(password=password)
@@ -180,34 +178,34 @@ class TelegramInvite:
                     logger.error(f"Password authentication failed: {password_error}")
                     print(f"{Fore.RED}✗ Password authentication failed: {password_error}{Style.RESET_ALL}")
                     return
-            else:
+            except Exception as login_error:
                 logger.error(f"Login failed: {login_error}")
                 print(f"{Fore.RED}✗ Login failed: {login_error}{Style.RESET_ALL}")
                 return
 
-        # Get user information
-        me = await client.get_me()
-        
-        # Store account details
-        self.accounts[phone_number] = {
-            'api_id': str(api_id),
-            'api_hash': api_hash,
-            'session_name': session_path,
-            'user_id': me.id,
-            'username': me.username or 'N/A',
-            'first_name': me.first_name or 'N/A',
-            'last_name': me.last_name or 'N/A'
-        }
-        
-        # Save accounts and close client
-        self.save_accounts()
-        await client.disconnect()
+            # Get user information
+            me = await client.get_me()
 
-        print(f"{Fore.GREEN}✓ Account {me.first_name} added successfully!{Style.RESET_ALL}")
-    
-    except Exception as e:
-        logger.error(f"Error adding account: {e}")
-        print(f"{Fore.RED}✗ Failed to add account: {e}{Style.RESET_ALL}")
+            # Store account details
+            self.accounts[phone_number] = {
+                'api_id': str(api_id),
+                'api_hash': api_hash,
+                'session_name': session_path,
+                'user_id': me.id,
+                'username': me.username or 'N/A',
+                'first_name': me.first_name or 'N/A',
+                'last_name': me.last_name or 'N/A'
+            }
+
+            # Save accounts and close client
+            self.save_accounts()
+            await client.disconnect()
+
+            print(f"{Fore.GREEN}✓ Account {me.first_name} added successfully!{Style.RESET_ALL}")
+
+        except Exception as e:
+            logger.error(f"Error adding account: {e}")
+            print(f"{Fore.RED}✗ Failed to add account: {e}{Style.RESET_ALL}")
             
     async def invite_members(self):
         """Enhanced member invitation with multi-account support."""
