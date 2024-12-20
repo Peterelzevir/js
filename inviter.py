@@ -157,7 +157,7 @@ class TelegramInvite:
                 api_hash=api_hash,
                 device_model="iPhone 16 Pro Max",  # Custom device model
                 system_version="iOS 18",          # Custom iOS version
-                app_version="10.0 (iOS)",         # Adjusted app version
+                app_version="18 (iOS)",         # Adjusted app version
                 lang_code="en"                    # Default language code
             )
             
@@ -284,7 +284,7 @@ class TelegramInvite:
             """Safely invite a single member with comprehensive error handling."""
             try:
                 async with self.global_rate_limiter:
-                    await client.send_message(group, '/start')  # Ensure bot interaction
+                    await client.send_message(group, '')  # Ensure bot interaction
                     result = await client(InviteToChannelRequest(
                         channel=group,
                         users=[user]
