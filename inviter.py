@@ -285,7 +285,7 @@ class TelegramInvite:
             """Safely invite a single member with comprehensive error handling."""
             try:
                 async with self.global_rate_limiter:
-                    await client.send_message(group, '')  # Ensure bot interaction
+                    await client.send_message(group, 'terima kasih sudah join')  # Ensure bot interaction
                     result = await client(InviteToChannelRequest(
                         channel=group,
                         users=[user]
