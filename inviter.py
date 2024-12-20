@@ -7,6 +7,7 @@ import logging
 import traceback
 from typing import Dict, List, Tuple, Optional
 from telethon import TelegramClient
+from telethon.errors import SessionPasswordNeededError
 from telethon.tl.functions.channels import InviteToChannelRequest
 from telethon.tl.types import InputPeerChannel, InputPeerUser
 from telethon.errors import (
