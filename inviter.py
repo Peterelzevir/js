@@ -131,48 +131,46 @@ class TelegramInvite:
             # Pause before next iteration
             input(f"\n{Fore.YELLOW}Press Enter to return to the main menu...{Style.RESET_ALL}")
 
-async def add_telegram_account(self):
-    """Enhanced account addition with more robust error handling."""
-    print(f"{Fore.CYAN}[Add Telegram Account]{Style.RESET_ALL}")
-    
-    try:
-        # Collect account details
-        api_id = input(f"{Fore.YELLOW}Enter API ID: {Style.RESET_ALL}")
-        api_hash = input(f"{Fore.YELLOW}Enter API Hash: {Style.RESET_ALL}")
-        phone_number = input(f"{Fore.YELLOW}Enter Phone Number (with country code, e.g., +62xxx): {Style.RESET_ALL}")
+    async def add_telegram_account(self):
+        """Enhanced account addition with more robust error handling."""
+        print(f"{Fore.CYAN}[Add Telegram Account]{Style.RESET_ALL}")
 
-        # Validate input
-        if not all([api_id, api_hash, phone_number]):
-            logger.error("All fields are required")
-            print(f"{Fore.RED}✗ All fields are mandatory!{Style.RESET_ALL}")
-            return
-
-        # Prepare session path
-        session_path = os.path.join(self.sessions_dir, phone_number)
-
-        # Custom client configuration for iPhone 16 Pro Max
-        client = TelegramClient(
-            session=session_path,
-            api_id=api_id,
-            api_hash=api_hash,
-            device_model="iPhone 16 Pro Max",  # Custom device model
-            system_version="iOS 18",          # Custom iOS version
-            app_version="10.0 (iOS)",         # Adjusted app version
-            lang_code="en"                    # Default language code
-        )
-        
-        # Connect and send code
-        await client.connect()
-        send_code_result = await client.send_code_request(phone_number)
-        
-        # Get verification code
-        verification_code = input(f"{Fore.GREEN}Enter OTP Code: {Style.RESET_ALL}")
-        
         try:
-            await client.sign_in(phone_number, verification_code)
-        except Exception as login_error:
-            # Handle if password is required
-            if 'password' in str(login_error).lower():
+            # Collect account details
+            api_id = input(f"{Fore.YELLOW}Enter API ID: {Style.RESET_ALL}")
+            api_hash = input(f"{Fore.YELLOW}Enter API Hash: {Style.RESET_ALL}")
+            phone_number = input(f"{Fore.YELLOW}Enter Phone Number (with country code, e.g., +62xxx): {Style.RESET_ALL}")
+
+            # Validate input
+            if not all([api_id, api_hash, phone_number]):
+                logger.error("All fields are required")
+                print(f"{Fore.RED}✗ All fields are mandatory!{Style.RESET_ALL}")
+                return
+
+            # Prepare session path
+            session_path = os.path.join(self.sessions_dir, phone_number)
+
+            # Custom client configuration for iPhone 16 Pro Max
+            client = TelegramClient(
+                session=session_path,
+                api_id=api_id,
+                api_hash=api_hash,
+                device_model="iPhone 16 Pro Max",  # Custom device model
+                system_version="iOS 18",          # Custom iOS version
+                app_version="10.0 (iOS)",         # Adjusted app version
+                lang_code="en"                    # Default language code
+            )
+            
+            # Connect and send code
+            await client.connect()
+            send_code_result = await client.send_code_request(phone_number)
+
+            # Get verification code
+            verification_code = input(f"{Fore.GREEN}Enter OTP Code: {Style.RESET_ALL}")
+
+            try:
+                await client.sign_in(phone_number, verification_code)
+            except SessionPasswordNeededError:
                 password = input(f"{Fore.YELLOW}Enter your password: {Style.RESET_ALL}")
                 try:
                     await client.sign_in(password=password)
@@ -180,35 +178,35 @@ async def add_telegram_account(self):
                     logger.error(f"Password authentication failed: {password_error}")
                     print(f"{Fore.RED}✗ Password authentication failed: {password_error}{Style.RESET_ALL}")
                     return
-            else:
+            except Exception as login_error:
                 logger.error(f"Login failed: {login_error}")
                 print(f"{Fore.RED}✗ Login failed: {login_error}{Style.RESET_ALL}")
                 return
 
-        # Get user information
-        me = await client.get_me()
-        
-        # Store account details
-        self.accounts[phone_number] = {
-            'api_id': str(api_id),
-            'api_hash': api_hash,
-            'session_name': session_path,
-            'user_id': me.id,
-            'username': me.username or 'N/A',
-            'first_name': me.first_name or 'N/A',
-            'last_name': me.last_name or 'N/A'
-        }
-        
-        # Save accounts and close client
-        self.save_accounts()
-        await client.disconnect()
+            # Get user information
+            me = await client.get_me()
 
-        print(f"{Fore.GREEN}✓ Account {me.first_name} added successfully!{Style.RESET_ALL}")
-    
-    except Exception as e:
-        logger.error(f"Error adding account: {e}")
-        print(f"{Fore.RED}✗ Failed to add account: {e}{Style.RESET_ALL}")
+            # Store account details
+            self.accounts[phone_number] = {
+                'api_id': str(api_id),
+                'api_hash': api_hash,
+                'session_name': session_path,
+                'user_id': me.id,
+                'username': me.username or 'N/A',
+                'first_name': me.first_name or 'N/A',
+                'last_name': me.last_name or 'N/A'
+            }
 
+            # Save accounts and close client
+            self.save_accounts()
+            await client.disconnect()
+
+            print(f"{Fore.GREEN}✓ Account {me.first_name} added successfully!{Style.RESET_ALL}")
+
+        except Exception as e:
+            logger.error(f"Error adding account: {e}")
+            print(f"{Fore.RED}✗ Failed to add account: {e}{Style.RESET_ALL}")
+            
     async def invite_members(self):
         """Enhanced member invitation with multi-account support."""
         if not self.accounts:
