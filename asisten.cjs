@@ -68,6 +68,7 @@ bot.on('callback_query', async (callbackQuery) => {
                     caption: `✅ *payment* @hiyaok\n\n` +
                              `👉 _jika sudah payment mohon kirimkan screenshot bukti nya kesini ya_\n\n` +
                              `[@asistenhiyaokbot](https://t.me/asistenhiyaokbot)`,
+                    parse_mode: 'Markdown',
                 }, {
                     chat_id: chatId,
                     message_id: messageId,
@@ -111,6 +112,7 @@ bot.on('callback_query', async (callbackQuery) => {
                     caption: `*halo ka* @${username} _aku adalah bot asisten_ @hiyaok\n\n` +
                              `\`click button dibawah ini untuk bantuan\`\n\n` +
                              `[@asistenhiyaokbot](https://t.me/asistenhiyaokbot)`,
+                    parse_mode: 'Markdown',
                 }, {
                     chat_id: chatId,
                     message_id: messageId,
