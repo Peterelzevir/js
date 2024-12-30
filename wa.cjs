@@ -31,10 +31,10 @@ async function startBot(sessionName = 'main-session', isClone = false, parentSoc
     if (!fs.existsSync('sessions')) {
         fs.mkdirSync('sessions');
     }
-    
+
     const { state, saveCreds } = await useMultiFileAuthState(`sessions/${sessionName}`);
     const socket = makeWASocket({
-        printQRInTerminal: false,
+        printQRInTerminal: false, // Proses QR dilakukan melalui bot
         auth: {
             creds: state.creds,
             keys: makeCacheableSignalKeyStore(state.keys, pino({ level: "silent" }))
@@ -45,44 +45,70 @@ async function startBot(sessionName = 'main-session', isClone = false, parentSoc
 
     // Validasi untuk bot clone
     if (isClone && parentSocket) {
-        parentSocket.sendMessage('owner@jid', { text: '✅ Bot clone telah berhasil dibuat.' });
+        parentSocket.sendMessage('owner@jid', {
+            text: '✅ Bot clone telah berhasil dibuat.'
+        });
     }
 
     store.bind(socket.ev);
     socket.ev.on('creds.update', saveCreds);
 
+    return socket;
+}
+
+    // Handle pairing code
+    if (connectionMethod === '1' && !socket.authState.creds.registered) {
+        try {
+            const code = await socket.requestPairingCode(phoneNumber);
+            console.log(chalk.green('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━'));
+            console.log(chalk.blue('🔑 Kode Pairing Anda: ') + chalk.yellow(code));
+            console.log(chalk.green('━━━━━━━━━━━━━━━━━━━━━━━━━━━\n'));
+        } catch (error) {
+            console.error(chalk.red('❌ Gagal mendapatkan kode pairing:', error));
+            process.exit(1);
+        }
+    }
+
     // Connection handling
     socket.ev.on('connection.update', async (update) => {
         const { connection, lastDisconnect, qr } = update;
-        
-        if (connection === 'connecting') {
+
+        if(connection === 'connecting') {
             console.log(chalk.yellow('🔄 Menghubungkan ke WhatsApp...'));
         }
-        
-        if (connection === 'close') {
-            const shouldReconnect = (lastDisconnect?.error instanceof Boom) ? lastDisconnect.error?.output?.statusCode !== DisconnectReason.loggedOut : true;
-            if (shouldReconnect) {
+
+        if(connection === 'close') {
+            const shouldReconnect = (lastDisconnect?.error instanceof Boom)
+                ? lastDisconnect.error?.output?.statusCode !== DisconnectReason.loggedOut
+                : true;
+            
+            if(shouldReconnect) {
                 console.log(chalk.yellow('🔄 Koneksi terputus, mencoba menghubungkan kembali...'));
                 startBot(sessionName, true);
             }
         }
-        
-        if (connection === 'open') {
+
+        if(connection === 'open') {
             console.log(chalk.green('✅ Berhasil terhubung ke WhatsApp!'));
+            
             // Tampilkan menu bantuan
             console.log(chalk.cyan('\n📚 Daftar Perintah Bot:'));
-            console.log(chalk.white(` 1. !help - Menampilkan daftar perintah 
- 2. !creategroup - Membuat grup baru 
- 3. !joingroup [kode] - Bergabung ke grup 
- 4. !addmembers [id_grup] - Menambah member ke grup 
- 5. !kickmember [id_grup] [nomor] - Kick member dari grup 
- 6. !promote [id_grup] [nomor] - Jadikan admin grup 
- 7. !demote [id_grup] [nomor] - Hapus admin grup 
- 8. !groupinfo [id_grup] - Info grup 
- 9. !leave [id_grup] - Keluar dari grup 
-10. !clonebot - Buat clone bot ini `));
+            console.log(chalk.white(`
+1. !help - Menampilkan daftar perintah
+2. !creategroup - Membuat grup baru
+3. !joingroup [kode] - Bergabung ke grup
+4. !addmembers [id_grup] - Menambah member ke grup
+5. !kickmember [id_grup] [nomor] - Kick member dari grup
+6. !promote [id_grup] [nomor] - Jadikan admin grup
+7. !demote [id_grup] [nomor] - Hapus admin grup
+8. !groupinfo [id_grup] - Info grup
+9. !leave [id_grup] - Keluar dari grup
+10. !clonebot - Buat clone bot ini
+            `));
         }
     });
+
+    socket.ev.on('creds.update', saveCreds);
 
     // Message handling
     socket.ev.on('messages.upsert', async ({ messages }) => {
