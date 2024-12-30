@@ -27,6 +27,8 @@ const showBanner = () => {
 ╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯ `));
 };
 
+let socket;
+
 async function startBot(sessionName = 'main-session', isClone = false, parentSocket = null) {
     if (!fs.existsSync('sessions')) {
         fs.mkdirSync('sessions');
@@ -53,8 +55,7 @@ async function startBot(sessionName = 'main-session', isClone = false, parentSoc
     store.bind(socket.ev);
     socket.ev.on('creds.update', saveCreds);
 
-    return socket;
-}
+    }
 
     // Handle pairing code
     if (connectionMethod === '1' && !socket.authState.creds.registered) {
