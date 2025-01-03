@@ -1,89 +1,122 @@
 const { Telegraf } = require('telegraf');
-const tesseract = require('tesseract.js');
 const sharp = require('sharp');
+const tesseract = require('tesseract.js');
+const { createCanvas, loadImage, registerFont } = require('canvas');
 const fs = require('fs');
 const path = require('path');
 
+// Registrasi font Roboto
+registerFont(require.resolve('@fontsource/roboto/files/roboto-latin-400-normal.woff2'), { family: 'Roboto' });
+
 const bot = new Telegraf('7745228249:AAH_USMrZGLHswRVWcDq71X_OB7F68cvAvU');
 
-let userSession = {};
-
-bot.on('photo', async (ctx) => {
-    const photo = ctx.message.photo.pop(); // Resolusi tertinggi
-    const fileId = photo.file_id;
-
-    const fileLink = await ctx.telegram.getFileLink(fileId);
-    const fileName = `${ctx.from.id}_${Date.now()}.jpg`;
-
-    // Unduh gambar
-    const imagePath = path.resolve(__dirname, fileName);
-    const response = await fetch(fileLink.href);
-    const buffer = Buffer.from(await response.arrayBuffer()); // Perbaikan
-    fs.writeFileSync(imagePath, buffer);
-
-    // Gunakan OCR untuk mendeteksi teks
+// Fungsi deteksi teks dengan OCR
+async function detectText(imagePath) {
     const ocrResult = await tesseract.recognize(imagePath, 'eng');
-    const detectedText = ocrResult.data.text;
+    return ocrResult.data;
+}
 
-    // Cari angka dalam teks yang terdeteksi
-    const numbers = detectedText.match(/\d+/g);
+// Fungsi edit gambar
+async function editImage(imagePath, textToReplace, newText) {
+    const originalImage = await loadImage(imagePath);
+    const canvas = createCanvas(originalImage.width, originalImage.height);
+    const ctx = canvas.getContext('2d');
 
-    if (numbers && numbers.length > 0) {
-        userSession[ctx.from.id] = { imagePath, detectedNumbers: numbers };
-        ctx.reply(
-            `Jumlah anggota terdeteksi: ${numbers.join(', ')}. Masukkan jumlah anggota baru:`
-        );
-    } else {
-        ctx.reply('Tidak dapat mendeteksi jumlah anggota. Kirim gambar lain.');
-        fs.unlinkSync(imagePath);
+    // Gambar ulang gambar asli
+    ctx.drawImage(originalImage, 0, 0);
+
+    // Deteksi teks dan tentukan posisi untuk mengganti teks
+    const detected = await detectText(imagePath);
+    const lines = detected.lines;
+    let targetLine = null;
+
+    for (const line of lines) {
+        if (line.text.includes(textToReplace)) {
+            targetLine = line;
+            break;
+        }
+    }
+
+    if (!targetLine) {
+        throw new Error('Teks yang ingin diganti tidak ditemukan.');
+    }
+
+    // Ganti teks di posisi yang sesuai
+    const { x0, y0, x1, y1 } = targetLine.bbox;
+    const textWidth = x1 - x0;
+    const textHeight = y1 - y0;
+
+    // Hapus teks lama
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(x0, y0, textWidth, textHeight);
+
+    // Tambahkan teks baru
+    ctx.font = `${textHeight}px Roboto`;
+    ctx.fillStyle = '#000000';
+    ctx.fillText(newText, x0, y1 - 5);
+
+    // Simpan gambar hasil edit
+    const outputImagePath = path.resolve(__dirname, `edited_${Date.now()}.jpg`);
+    const buffer = canvas.toBuffer('image/jpeg');
+    fs.writeFileSync(outputImagePath, buffer);
+
+    return outputImagePath;
+}
+
+// Bot menerima gambar
+bot.on('photo', async (ctx) => {
+    try {
+        const photo = ctx.message.photo.pop(); // Resolusi tertinggi
+        const fileId = photo.file_id;
+        const fileLink = await ctx.telegram.getFileLink(fileId);
+        const fileName = `${ctx.from.id}_${Date.now()}.jpg`;
+
+        // Unduh gambar
+        const imagePath = path.resolve(__dirname, fileName);
+        const response = await fetch(fileLink.href);
+        const buffer = Buffer.from(await response.arrayBuffer());
+        fs.writeFileSync(imagePath, buffer);
+
+        // Deteksi teks "Grup · x anggota"
+        const detectedText = await detectText(imagePath);
+        const match = detectedText.text.match(/(Grup|Group)\s·\s(\d+)\sanggota/);
+
+        if (!match) {
+            return ctx.reply('Tidak dapat mendeteksi teks "Grup · x anggota". Pastikan gambar sesuai format.');
+        }
+
+        const oldText = match[0];
+        const currentCount = match[2];
+        ctx.reply(`Jumlah anggota terdeteksi: ${currentCount}. Masukkan jumlah anggota baru:`);
+
+        // Simpan sesi
+        ctx.session = { imagePath, oldText };
+    } catch (err) {
+        console.error(err);
+        ctx.reply('Terjadi kesalahan saat memproses gambar.');
     }
 });
 
+// Bot menerima jumlah anggota baru
 bot.on('text', async (ctx) => {
-    const userId = ctx.from.id;
+    const newCount = ctx.message.text;
 
-    if (userSession[userId] && userSession[userId].imagePath) {
-        const newCount = ctx.message.text;
+    if (isNaN(newCount)) {
+        return ctx.reply('Jumlah anggota harus berupa angka.');
+    }
 
-        if (isNaN(newCount)) {
-            return ctx.reply('Jumlah anggota harus berupa angka.');
-        }
+    const { imagePath, oldText } = ctx.session;
 
-        const { imagePath } = userSession[userId];
+    try {
+        const editedImagePath = await editImage(imagePath, oldText, `Grup · ${newCount} anggota`);
+        await ctx.replyWithPhoto({ source: editedImagePath });
 
-        // Ganti angka dalam gambar
-        try {
-            const editedImagePath = path.resolve(__dirname, `edited_${userId}.jpg`);
-
-            // Tambahkan teks baru
-            const svgOverlay = `
-                <svg width="500" height="100">
-                    <rect x="50" y="20" width="200" height="60" fill="white" />
-                    <text x="60" y="60" font-size="40" fill="black">${newCount}</text>
-                </svg>
-            `;
-
-            await sharp(imagePath)
-                .composite([
-                    {
-                        input: Buffer.from(svgOverlay),
-                        top: 100, // Sesuaikan posisi
-                        left: 100,
-                    },
-                ])
-                .toFile(editedImagePath);
-
-            ctx.replyWithPhoto({ source: editedImagePath });
-        } catch (err) {
-            console.error(err);
-            ctx.reply('Terjadi kesalahan saat mengedit gambar.');
-        } finally {
-            // Bersihkan file sementara
-            fs.unlinkSync(imagePath);
-            delete userSession[userId];
-        }
-    } else {
-        ctx.reply('Kirimkan gambar terlebih dahulu.');
+        // Bersihkan file sementara
+        fs.unlinkSync(imagePath);
+        fs.unlinkSync(editedImagePath);
+    } catch (err) {
+        console.error(err);
+        ctx.reply('Terjadi kesalahan saat mengedit gambar.');
     }
 });
 
