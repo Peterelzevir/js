@@ -126,6 +126,7 @@ async function detectFontProperties(imagePath, bbox) {
     };
 }
 
+// Fungsi edit gambar
 async function editImage(imagePath, newCount) {
     try {
         const image = await sharp(imagePath);
@@ -138,58 +139,26 @@ async function editImage(imagePath, newCount) {
         ctx.drawImage(originalImage, 0, 0);
         
         const groupText = await detectGroupText(imagePath);
-        const { bbox, originalFont } = groupText;
+        console.log('Detected group text:', groupText);
         
-        // Enhanced background analysis and matching
-        const regionBuffer = await sharp(imagePath)
-            .extract({
-                left: bbox.x0,
-                top: bbox.y0,
-                width: bbox.x1 - bbox.x0,
-                height: bbox.y1 - bbox.y0
-            })
-            .toBuffer();
-
-        const stats = await sharp(regionBuffer).stats();
+        const { bbox } = groupText;
         
-        // Create gradient background
-        const gradient = ctx.createLinearGradient(bbox.x0, bbox.y0, bbox.x1, bbox.y1);
-        gradient.addColorStop(0, `rgba(${stats.channels[0].mean}, ${stats.channels[1].mean}, ${stats.channels[2].mean}, 1)`);
-        gradient.addColorStop(1, `rgba(${stats.channels[0].mean}, ${stats.channels[1].mean}, ${stats.channels[2].mean}, 0.95)`);
-        
-        // Clear and fill background
-        ctx.fillStyle = gradient;
+        // Clear text area
+        ctx.fillStyle = '#FFFFFF';
         ctx.fillRect(bbox.x0, bbox.y0, bbox.x1 - bbox.x0, bbox.y1 - bbox.y0);
         
-        // Enhanced text rendering
+        // Set text style
+        const fontSize = Math.floor((bbox.y1 - bbox.y0) * 0.8);
+        ctx.font = `${fontSize}px -apple-system, "Segoe UI", Roboto, sans-serif`;
+        ctx.fillStyle = '#202124';
         ctx.textBaseline = 'middle';
-        ctx.textAlign = 'left';
-        ctx.imageSmoothingEnabled = true;
-        ctx.imageSmoothingQuality = 'high';
         
-        // Apply font settings
-        const fontStack = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
-        ctx.font = `${originalFont.fontSize}px ${fontStack}`;
-        ctx.fillStyle = originalFont.color;
-        
-        // Add text with proper positioning
+        // Write new text
         const newText = `Grup · ${newCount} anggota`;
         const textY = bbox.y0 + (bbox.y1 - bbox.y0) / 2;
+        ctx.fillText(newText, bbox.x0, textY);
         
-        // Add shadow for light text
-        if (originalFont.color === '#FFFFFF') {
-            ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
-            ctx.shadowBlur = 2;
-            ctx.shadowOffsetX = 1;
-            ctx.shadowOffsetY = 1;
-        }
-        
-        ctx.fillText(newText, bbox.x0 + 5, textY);
-        
-        // Reset shadow
-        ctx.shadowColor = 'transparent';
-        
-        // Save with maximum quality
+        // Save result
         const outputPath = path.resolve(__dirname, `edited_${Date.now()}.jpg`);
         const buffer = canvas.toBuffer('image/jpeg', { quality: 1 });
         
