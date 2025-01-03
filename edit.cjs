@@ -153,7 +153,7 @@ async function editImage(imagePath, newCount) {
     }
 }
 
-// Handler foto
+// Handler untuk menerima foto
 bot.on('photo', async (ctx) => {
     try {
         console.log('Menerima foto baru');
@@ -170,42 +170,70 @@ bot.on('photo', async (ctx) => {
         console.log('Gambar tersimpan:', imagePath);
         
         const groupText = await detectGroupText(imagePath);
+        
+        // Simpan data lengkap ke session
+        ctx.session = { 
+            imagePath,
+            waitingForCount: true, // Flag untuk menandai sedang menunggu input
+            lastMessageTime: Date.now() // Timestamp pesan terakhir
+        };
+        
         await ctx.reply(
             `✅ Terdeteksi: ${groupText.memberCount} anggota\n` +
             `📝 Silakan kirim jumlah anggota baru:`
         );
         
-        ctx.session = { imagePath };
     } catch (error) {
         console.error('Error handler foto:', error);
         await ctx.reply('❌ Gagal memproses gambar. Pastikan screenshot mengandung teks "Grup · X anggota"');
     }
 });
 
-// Handler text
+// Handler untuk menerima text
 bot.on('text', async (ctx) => {
-    if (!ctx.session?.imagePath) {
-        return ctx.reply('⚠️ Silakan kirim screenshot grup terlebih dahulu.');
-    }
-
-    const newCount = ctx.message.text;
-    if (!/^\d+$/.test(newCount)) {
-        return ctx.reply('⚠️ Mohon masukkan angka yang valid.');
-    }
-
     try {
-        ctx.reply('⏳ Sedang memproses...');
+        // Cek apakah ada session dan sedang menunggu input
+        if (!ctx.session?.imagePath || !ctx.session?.waitingForCount) {
+            return ctx.reply('⚠️ Silakan kirim screenshot grup terlebih dahulu.');
+        }
+
+        // Cek apakah input sudah timeout (opsional, 5 menit timeout)
+        const timeoutDuration = 5 * 60 * 1000; // 5 menit
+        if (Date.now() - ctx.session.lastMessageTime > timeoutDuration) {
+            delete ctx.session;
+            return ctx.reply('⚠️ Sesi telah kedaluwarsa. Silakan kirim screenshot baru.');
+        }
+
+        const newCount = ctx.message.text;
+        if (!/^\d+$/.test(newCount)) {
+            return ctx.reply('⚠️ Mohon masukkan angka yang valid.');
+        }
+
+        await ctx.reply('⏳ Sedang memproses...');
         const editedPath = await editImage(ctx.session.imagePath, newCount);
         await ctx.replyWithPhoto({ source: editedPath });
         
-        // Cleanup
+        // Cleanup files dan session
         fs.unlinkSync(ctx.session.imagePath);
         fs.unlinkSync(editedPath);
         delete ctx.session;
+        
     } catch (error) {
         console.error('Error handler text:', error);
         await ctx.reply('❌ Gagal mengedit gambar. Silakan coba lagi.');
+        
+        // Cleanup pada error
+        if (ctx.session?.imagePath && fs.existsSync(ctx.session.imagePath)) {
+            fs.unlinkSync(ctx.session.imagePath);
+        }
+        delete ctx.session;
     }
+});
+
+// Tambahkan session middleware jika belum ada
+bot.use((ctx, next) => {
+    if (!ctx.session) ctx.session = {};
+    return next();
 });
 
 // Error handler
