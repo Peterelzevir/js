@@ -18,7 +18,7 @@ bot.on('photo', async (ctx) => {
     // Unduh gambar
     const imagePath = path.resolve(__dirname, fileName);
     const response = await fetch(fileLink.href);
-    const buffer = await response.buffer();
+    const buffer = Buffer.from(await response.arrayBuffer()); // Perbaikan
     fs.writeFileSync(imagePath, buffer);
 
     // Gunakan OCR untuk mendeteksi teks
@@ -55,7 +55,7 @@ bot.on('text', async (ctx) => {
         try {
             const editedImagePath = path.resolve(__dirname, `edited_${userId}.jpg`);
 
-            // Hapus angka lama dengan kotak kosong
+            // Tambahkan teks baru
             const svgOverlay = `
                 <svg width="500" height="100">
                     <rect x="50" y="20" width="200" height="60" fill="white" />
