@@ -306,8 +306,7 @@ bot.on('callback_query', async (callbackQuery) => {
             break;
 
         case 'location':
-            await bot.sendMessage(chatId, 'ʟᴏᴋᴀꜱɪ ᴋᴀᴍᴜ ᴄᴜʏ ʙᴜᴀᴛ ᴜꜱᴇʀʙᴏᴛ ʟᴇʙɪʜ ᴋᴇᴄᴇ
- :', {
+            await bot.sendMessage(chatId, 'ʟᴏᴋᴀꜱɪ ᴋᴀᴍᴜ ᴄᴜʏ ʙᴜᴀᴛ ᴜꜱᴇʀʙᴏᴛ ʟᴇʙɪʜ ᴋᴇᴄᴇ :', {
                 reply_markup: {
                     keyboard: [[{
                         text: '💡 Lokasi',
