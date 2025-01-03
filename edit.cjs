@@ -7,6 +7,9 @@ const path = require('path');
 
 const bot = new Telegraf('7745228249:AAH_USMrZGLHswRVWcDq71X_OB7F68cvAvU');
 
+// Tambahkan session middleware di awal
+bot.use(session());
+
 // Improved image preprocessing
 async function preprocessImage(imagePath) {
     const preprocessedPath = `${imagePath}_prep.jpg`;
