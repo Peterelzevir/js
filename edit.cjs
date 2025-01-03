@@ -10,35 +10,23 @@ const bot = new Telegraf('7745228249:AAH_USMrZGLHswRVWcDq71X_OB7F68cvAvU');
 // Enhanced session handling
 const sessions = new Map();
 
+// Fungsi untuk preprocessing gambar
 async function preprocessImage(imagePath) {
     const preprocessedPath = `${imagePath}_prep.jpg`;
     await sharp(imagePath)
-        .resize(2000, null, {
-            withoutEnlargement: true,
-            kernel: sharp.kernel.lanczos3,
-            fastShrinkOnLoad: false
+        .resize(1500, null, {
+            withoutEnlargement: true
         })
         .modulate({
-            brightness: 1.1,
+            brightness: 1.2,
             contrast: 1.2
         })
-        .sharpen({
-            sigma: 2.0,
-            m1: 2.0,
-            m2: 0.5,
-            x1: 6,
-            y2: 20,
-            y3: 40
-        })
-        .toFormat('jpeg', {
-            quality: 100,
-            chromaSubsampling: '4:4:4',
-            force: true
-        })
+        .sharpen()
         .toFile(preprocessedPath);
     return preprocessedPath;
 }
 
+// Fungsi deteksi teks grup
 async function detectGroupText(imagePath) {
     try {
         console.log('Memulai OCR pada gambar:', imagePath);
@@ -49,10 +37,9 @@ async function detectGroupText(imagePath) {
             preprocessedPath,
             'eng+ind',
             {
-                tessedit_char_whitelist: 'Grup·:. 0123456789anggotmberMBERGOUP',
+                tessedit_char_whitelist: 'Grup·:. 0123456789anggotmberMBER',
                 tessedit_pageseg_mode: '6',
-                preserve_interword_spaces: '1',
-                tessedit_ocr_engine_mode: '3'
+                preserve_interword_spaces: '1'
             }
         );
 
@@ -60,26 +47,18 @@ async function detectGroupText(imagePath) {
         fs.unlinkSync(preprocessedPath);
 
         const patterns = [
-            /(Grup|Group|GRUP|GROUP)\s*[·:. ]\s*(\d{1,6})\s*(anggota|member|ANGGOTA|MEMBER)/i,
-            /(\d{1,6})\s*(anggota|member|ANGGOTA|MEMBER)/i,
-            /(Grup|Group|GRUP|GROUP)\s*[·:. ]\s*(\d{1,6})/i
+            /(Grup|Group|GRUP|GROUP)\s*[·:. ]\s*(\d+)\s*(anggota|member|ANGGOTA|MEMBER)/i,
+            /(\d+)\s*(anggota|member|ANGGOTA|MEMBER)/i,
+            /(Grup|Group|GRUP|GROUP)\s*[·:. ]\s*(\d+)/i
         ];
 
         let groupTextMatch = null;
-        let bestMatch = null;
-        let highestConfidence = 0;
-
-        for (const word of data.words || []) {
-            for (const pattern of patterns) {
-                const match = word.text.match(pattern);
-                if (match && word.confidence > highestConfidence) {
-                    highestConfidence = word.confidence;
-                    bestMatch = match;
-                    groupTextMatch = {
-                        text: word.text,
-                        bbox: word.bbox
-                    };
-                }
+        for (const pattern of patterns) {
+            const match = data.text.match(pattern);
+            if (match) {
+                groupTextMatch = match;
+                console.log('Pattern matched:', match[0]);
+                break;
             }
         }
 
@@ -87,21 +66,37 @@ async function detectGroupText(imagePath) {
             throw new Error('Teks grup tidak ditemukan');
         }
 
-        const memberCount = bestMatch[0].match(/\d+/)[0];
-        
-        let bbox = {
-            x0: Math.max(0, groupTextMatch.bbox.x0 - 100),
-            y0: Math.max(0, groupTextMatch.bbox.y0 - 8),
-            x1: Math.min(data.width, groupTextMatch.bbox.x1 + 140),
-            y1: Math.min(data.height, groupTextMatch.bbox.y1 + 8)
-        };
+        let bbox = null;
+        const memberCount = groupTextMatch[0].match(/\d+/)[0];
+        const words = data.words || [];
+
+        // Mencari bbox berdasarkan angka member
+        for (const word of words) {
+            if (word.text.includes(memberCount)) {
+                bbox = {
+                    x0: Math.max(0, word.bbox.x0 - 60),
+                    y0: word.bbox.y0,
+                    x1: Math.min(data.width, word.bbox.x1 + 100),
+                    y1: word.bbox.y1
+                };
+                break;
+            }
+        }
+
+        if (!bbox) {
+            bbox = {
+                x0: Math.floor(data.width * 0.3),
+                y0: Math.floor(data.height * 0.3),
+                x1: Math.floor(data.width * 0.7),
+                y1: Math.floor(data.height * 0.4)
+            };
+        }
 
         return {
-            text: groupTextMatch.text,
+            text: groupTextMatch[0],
             memberCount,
             bbox,
-            confidence: highestConfidence,
-            originalFont: await detectFontProperties(imagePath, bbox)
+            confidence: data.confidence
         };
 
     } catch (error) {
