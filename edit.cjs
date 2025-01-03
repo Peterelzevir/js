@@ -7,20 +7,19 @@ const path = require('path');
 
 const bot = new Telegraf('7745228249:AAH_USMrZGLHswRVWcDq71X_OB7F68cvAvU');
 
-// Improved session handling
+// Enhanced session handling
 const sessions = new Map();
 
-// Enhanced image preprocessing with better quality settings
 async function preprocessImage(imagePath) {
     const preprocessedPath = `${imagePath}_prep.jpg`;
     await sharp(imagePath)
         .resize(2000, null, {
             withoutEnlargement: true,
             kernel: sharp.kernel.lanczos3,
-            fastShrinkOnLoad: false // Better quality for resizing
+            fastShrinkOnLoad: false
         })
         .modulate({
-            brightness: 1.1,  // Slightly reduced to prevent over-brightening
+            brightness: 1.1,
             contrast: 1.2
         })
         .sharpen({
@@ -40,9 +39,10 @@ async function preprocessImage(imagePath) {
     return preprocessedPath;
 }
 
-// Improved text detection with better pattern matching
 async function detectGroupText(imagePath) {
     try {
+        console.log('Memulai OCR pada gambar:', imagePath);
+        
         const preprocessedPath = await preprocessImage(imagePath);
         
         const { data } = await tesseract.recognize(
@@ -56,9 +56,9 @@ async function detectGroupText(imagePath) {
             }
         );
 
+        console.log('Hasil OCR mentah:', data.text);
         fs.unlinkSync(preprocessedPath);
 
-        // More comprehensive pattern matching
         const patterns = [
             /(Grup|Group|GRUP|GROUP)\s*[·:. ]\s*(\d{1,6})\s*(anggota|member|ANGGOTA|MEMBER)/i,
             /(\d{1,6})\s*(anggota|member|ANGGOTA|MEMBER)/i,
@@ -89,8 +89,7 @@ async function detectGroupText(imagePath) {
 
         const memberCount = bestMatch[0].match(/\d+/)[0];
         
-        // Improved bounding box calculation
-        const bbox = {
+        let bbox = {
             x0: Math.max(0, groupTextMatch.bbox.x0 - 100),
             y0: Math.max(0, groupTextMatch.bbox.y0 - 8),
             x1: Math.min(data.width, groupTextMatch.bbox.x1 + 140),
@@ -111,7 +110,6 @@ async function detectGroupText(imagePath) {
     }
 }
 
-// New function to detect font properties
 async function detectFontProperties(imagePath, bbox) {
     const image = await sharp(imagePath);
     const metadata = await image.metadata();
@@ -124,7 +122,6 @@ async function detectFontProperties(imagePath, bbox) {
         })
         .toBuffer();
 
-    // Analyze the region to detect if it's light or dark text
     const stats = await sharp(region).stats();
     const brightness = (stats.channels[0].mean + stats.channels[1].mean + stats.channels[2].mean) / 3;
     
@@ -134,7 +131,6 @@ async function detectFontProperties(imagePath, bbox) {
     };
 }
 
-// Significantly improved image editing
 async function editImage(imagePath, newCount) {
     try {
         const image = await sharp(imagePath);
@@ -161,7 +157,7 @@ async function editImage(imagePath, newCount) {
 
         const stats = await sharp(regionBuffer).stats();
         
-        // Create gradient background if detected
+        // Create gradient background
         const gradient = ctx.createLinearGradient(bbox.x0, bbox.y0, bbox.x1, bbox.y1);
         gradient.addColorStop(0, `rgba(${stats.channels[0].mean}, ${stats.channels[1].mean}, ${stats.channels[2].mean}, 1)`);
         gradient.addColorStop(1, `rgba(${stats.channels[0].mean}, ${stats.channels[1].mean}, ${stats.channels[2].mean}, 0.95)`);
@@ -185,7 +181,7 @@ async function editImage(imagePath, newCount) {
         const newText = `Grup · ${newCount} anggota`;
         const textY = bbox.y0 + (bbox.y1 - bbox.y0) / 2;
         
-        // Add slight shadow if text is light
+        // Add shadow for light text
         if (originalFont.color === '#FFFFFF') {
             ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
             ctx.shadowBlur = 2;
@@ -210,15 +206,18 @@ async function editImage(imagePath, newCount) {
             .toFile(outputPath);
         
         return outputPath;
+        
     } catch (error) {
         console.error('Error dalam editImage:', error);
         throw error;
     }
 }
 
-// Improved photo handler with better session management
+// Handler foto
 bot.on('photo', async (ctx) => {
     try {
+        console.log('Menerima foto baru');
+        
         const photo = ctx.message.photo.pop();
         const file = await ctx.telegram.getFile(photo.file_id);
         const fileName = `${ctx.from.id}_${Date.now()}.jpg`;
@@ -227,6 +226,8 @@ bot.on('photo', async (ctx) => {
         const response = await fetch(`https://api.telegram.org/file/bot${bot.token}/${file.file_path}`);
         const buffer = Buffer.from(await response.arrayBuffer());
         fs.writeFileSync(imagePath, buffer);
+        
+        console.log('Gambar tersimpan:', imagePath);
         
         const groupText = await detectGroupText(imagePath);
         
@@ -251,7 +252,23 @@ bot.on('photo', async (ctx) => {
     }
 });
 
-// Improved text handler with better session checking
+// Handler untuk tombol cancel
+bot.action('cancel_edit', async (ctx) => {
+    try {
+        const session = sessions.get(ctx.from.id);
+        if (session?.imagePath && fs.existsSync(session.imagePath)) {
+            fs.unlinkSync(session.imagePath);
+        }
+        sessions.delete(ctx.from.id);
+        await ctx.editMessageText('❌ Proses dibatalkan. Silakan kirim screenshot baru.');
+        await ctx.answerCbQuery('Proses dibatalkan');
+    } catch (error) {
+        console.error('Error handling cancel:', error);
+        await ctx.answerCbQuery('Gagal membatalkan proses');
+    }
+});
+
+// Handler text
 bot.on('text', async (ctx) => {
     try {
         const session = sessions.get(ctx.from.id);
@@ -259,7 +276,7 @@ bot.on('text', async (ctx) => {
             return;
         }
 
-        const timeoutDuration = 5 * 60 * 1000;
+        const timeoutDuration = 5 * 60 * 1000; // 5 menit
         if (Date.now() - session.lastMessageTime > timeoutDuration) {
             if (session.imagePath && fs.existsSync(session.imagePath)) {
                 fs.unlinkSync(session.imagePath);
@@ -295,24 +312,15 @@ bot.on('text', async (ctx) => {
     }
 });
 
-// Handler untuk tombol cancel
-bot.action('cancel_edit', async (ctx) => {
-    try {
-        if (ctx.session?.imagePath) {
-            fs.unlinkSync(ctx.session.imagePath);
-        }
-        delete ctx.session;
-        await ctx.editMessageText('❌ Proses dibatalkan. Silakan kirim screenshot baru.');
-        await ctx.answerCbQuery('Proses dibatalkan');
-    } catch (error) {
-        console.error('Error handling cancel:', error);
-        await ctx.answerCbQuery('Gagal membatalkan proses');
-    }
+// Error handler
+bot.catch((err, ctx) => {
+    console.error('Bot error:', err);
+    ctx.reply('❌ Terjadi kesalahan pada bot. Silakan coba lagi.');
 });
-// Other handlers remain the same...
 
 bot.launch();
 console.log('✅ Bot berjalan...');
 
+// Graceful stop
 process.once('SIGINT', () => bot.stop('SIGINT'));
 process.once('SIGTERM', () => bot.stop('SIGTERM'));
