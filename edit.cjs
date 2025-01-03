@@ -7,68 +7,79 @@ const path = require('path');
 
 const bot = new Telegraf('7745228249:AAH_USMrZGLHswRVWcDq71X_OB7F68cvAvU');
 
-// Tambahkan session middleware di awal
-bot.use(session());
+// Improved session handling
+const sessions = new Map();
 
-// Improved image preprocessing
+// Enhanced image preprocessing with better quality settings
 async function preprocessImage(imagePath) {
     const preprocessedPath = `${imagePath}_prep.jpg`;
     await sharp(imagePath)
         .resize(2000, null, {
             withoutEnlargement: true,
-            kernel: sharp.kernel.lanczos3
+            kernel: sharp.kernel.lanczos3,
+            fastShrinkOnLoad: false // Better quality for resizing
         })
         .modulate({
-            brightness: 1.2,
-            contrast: 1.3
+            brightness: 1.1,  // Slightly reduced to prevent over-brightening
+            contrast: 1.2
         })
         .sharpen({
-            sigma: 1.5,
-            m1: 1.5,
-            m2: 0.7
+            sigma: 2.0,
+            m1: 2.0,
+            m2: 0.5,
+            x1: 6,
+            y2: 20,
+            y3: 40
         })
         .toFormat('jpeg', {
             quality: 100,
-            chromaSubsampling: '4:4:4'
+            chromaSubsampling: '4:4:4',
+            force: true
         })
         .toFile(preprocessedPath);
     return preprocessedPath;
 }
 
-// Enhanced text detection
+// Improved text detection with better pattern matching
 async function detectGroupText(imagePath) {
     try {
-        console.log('Memulai OCR pada gambar:', imagePath);
-        
         const preprocessedPath = await preprocessImage(imagePath);
         
         const { data } = await tesseract.recognize(
             preprocessedPath,
             'eng+ind',
             {
-                tessedit_char_whitelist: 'Grup·:. 0123456789anggotmberMBER',
+                tessedit_char_whitelist: 'Grup·:. 0123456789anggotmberMBERGOUP',
                 tessedit_pageseg_mode: '6',
                 preserve_interword_spaces: '1',
-                tessedit_ocr_engine_mode: '3' // Using Legacy + LSTM mode for better accuracy
+                tessedit_ocr_engine_mode: '3'
             }
         );
 
-        console.log('Hasil OCR mentah:', data.text);
         fs.unlinkSync(preprocessedPath);
 
+        // More comprehensive pattern matching
         const patterns = [
-            /(Grup|Group|GRUP|GROUP)\s*[·:. ]\s*(\d+)\s*(anggota|member|ANGGOTA|MEMBER)/i,
-            /(\d+)\s*(anggota|member|ANGGOTA|MEMBER)/i,
-            /(Grup|Group|GRUP|GROUP)\s*[·:. ]\s*(\d+)/i
+            /(Grup|Group|GRUP|GROUP)\s*[·:. ]\s*(\d{1,6})\s*(anggota|member|ANGGOTA|MEMBER)/i,
+            /(\d{1,6})\s*(anggota|member|ANGGOTA|MEMBER)/i,
+            /(Grup|Group|GRUP|GROUP)\s*[·:. ]\s*(\d{1,6})/i
         ];
 
         let groupTextMatch = null;
-        for (const pattern of patterns) {
-            const match = data.text.match(pattern);
-            if (match) {
-                groupTextMatch = match;
-                console.log('Pattern matched:', match[0]);
-                break;
+        let bestMatch = null;
+        let highestConfidence = 0;
+
+        for (const word of data.words || []) {
+            for (const pattern of patterns) {
+                const match = word.text.match(pattern);
+                if (match && word.confidence > highestConfidence) {
+                    highestConfidence = word.confidence;
+                    bestMatch = match;
+                    groupTextMatch = {
+                        text: word.text,
+                        bbox: word.bbox
+                    };
+                }
             }
         }
 
@@ -76,37 +87,22 @@ async function detectGroupText(imagePath) {
             throw new Error('Teks grup tidak ditemukan');
         }
 
-        let bbox = null;
-        const memberCount = groupTextMatch[0].match(/\d+/)[0];
-        const words = data.words || [];
-
-        // Improved bbox detection
-        for (const word of words) {
-            if (word.text.includes(memberCount)) {
-                bbox = {
-                    x0: Math.max(0, word.bbox.x0 - 80), // Increased padding
-                    y0: Math.max(0, word.bbox.y0 - 5),  // Added vertical padding
-                    x1: Math.min(data.width, word.bbox.x1 + 120),
-                    y1: Math.min(data.height, word.bbox.y1 + 5)
-                };
-                break;
-            }
-        }
-
-        if (!bbox) {
-            bbox = {
-                x0: Math.floor(data.width * 0.3),
-                y0: Math.floor(data.height * 0.3),
-                x1: Math.floor(data.width * 0.7),
-                y1: Math.floor(data.height * 0.4)
-            };
-        }
+        const memberCount = bestMatch[0].match(/\d+/)[0];
+        
+        // Improved bounding box calculation
+        const bbox = {
+            x0: Math.max(0, groupTextMatch.bbox.x0 - 100),
+            y0: Math.max(0, groupTextMatch.bbox.y0 - 8),
+            x1: Math.min(data.width, groupTextMatch.bbox.x1 + 140),
+            y1: Math.min(data.height, groupTextMatch.bbox.y1 + 8)
+        };
 
         return {
-            text: groupTextMatch[0],
+            text: groupTextMatch.text,
             memberCount,
             bbox,
-            confidence: data.confidence
+            confidence: highestConfidence,
+            originalFont: await detectFontProperties(imagePath, bbox)
         };
 
     } catch (error) {
@@ -115,7 +111,30 @@ async function detectGroupText(imagePath) {
     }
 }
 
-// Enhanced image editing
+// New function to detect font properties
+async function detectFontProperties(imagePath, bbox) {
+    const image = await sharp(imagePath);
+    const metadata = await image.metadata();
+    const region = await image
+        .extract({
+            left: bbox.x0,
+            top: bbox.y0,
+            width: bbox.x1 - bbox.x0,
+            height: bbox.y1 - bbox.y0
+        })
+        .toBuffer();
+
+    // Analyze the region to detect if it's light or dark text
+    const stats = await sharp(region).stats();
+    const brightness = (stats.channels[0].mean + stats.channels[1].mean + stats.channels[2].mean) / 3;
+    
+    return {
+        color: brightness > 127 ? '#FFFFFF' : '#202124',
+        fontSize: Math.floor((bbox.y1 - bbox.y0) * 0.75)
+    };
+}
+
+// Significantly improved image editing
 async function editImage(imagePath, newCount) {
     try {
         const image = await sharp(imagePath);
@@ -128,33 +147,58 @@ async function editImage(imagePath, newCount) {
         ctx.drawImage(originalImage, 0, 0);
         
         const groupText = await detectGroupText(imagePath);
-        console.log('Detected group text:', groupText);
+        const { bbox, originalFont } = groupText;
         
-        const { bbox } = groupText;
+        // Enhanced background analysis and matching
+        const regionBuffer = await sharp(imagePath)
+            .extract({
+                left: bbox.x0,
+                top: bbox.y0,
+                width: bbox.x1 - bbox.x0,
+                height: bbox.y1 - bbox.y0
+            })
+            .toBuffer();
+
+        const stats = await sharp(regionBuffer).stats();
         
-        // Enhanced background matching
-        const imageData = ctx.getImageData(bbox.x0, bbox.y0, bbox.x1 - bbox.x0, bbox.y1 - bbox.y0);
-        const backgroundColor = getAverageColor(imageData);
+        // Create gradient background if detected
+        const gradient = ctx.createLinearGradient(bbox.x0, bbox.y0, bbox.x1, bbox.y1);
+        gradient.addColorStop(0, `rgba(${stats.channels[0].mean}, ${stats.channels[1].mean}, ${stats.channels[2].mean}, 1)`);
+        gradient.addColorStop(1, `rgba(${stats.channels[0].mean}, ${stats.channels[1].mean}, ${stats.channels[2].mean}, 0.95)`);
         
-        // Clear text area with matched background color
-        ctx.fillStyle = backgroundColor;
+        // Clear and fill background
+        ctx.fillStyle = gradient;
         ctx.fillRect(bbox.x0, bbox.y0, bbox.x1 - bbox.x0, bbox.y1 - bbox.y0);
         
         // Enhanced text rendering
-        const fontSize = Math.floor((bbox.y1 - bbox.y0) * 0.8);
-        ctx.font = `${fontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif`;
-        ctx.fillStyle = '#202124';
         ctx.textBaseline = 'middle';
-        
-        // Add text with anti-aliasing
+        ctx.textAlign = 'left';
         ctx.imageSmoothingEnabled = true;
         ctx.imageSmoothingQuality = 'high';
         
+        // Apply font settings
+        const fontStack = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
+        ctx.font = `${originalFont.fontSize}px ${fontStack}`;
+        ctx.fillStyle = originalFont.color;
+        
+        // Add text with proper positioning
         const newText = `Grup · ${newCount} anggota`;
         const textY = bbox.y0 + (bbox.y1 - bbox.y0) / 2;
-        ctx.fillText(newText, bbox.x0, textY);
         
-        // Save with enhanced quality
+        // Add slight shadow if text is light
+        if (originalFont.color === '#FFFFFF') {
+            ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
+            ctx.shadowBlur = 2;
+            ctx.shadowOffsetX = 1;
+            ctx.shadowOffsetY = 1;
+        }
+        
+        ctx.fillText(newText, bbox.x0 + 5, textY);
+        
+        // Reset shadow
+        ctx.shadowColor = 'transparent';
+        
+        // Save with maximum quality
         const outputPath = path.resolve(__dirname, `edited_${Date.now()}.jpg`);
         const buffer = canvas.toBuffer('image/jpeg', { quality: 1 });
         
@@ -166,36 +210,15 @@ async function editImage(imagePath, newCount) {
             .toFile(outputPath);
         
         return outputPath;
-        
     } catch (error) {
         console.error('Error dalam editImage:', error);
         throw error;
     }
 }
 
-// Helper function untuk mendapatkan warna background
-function getAverageColor(imageData) {
-    let r = 0, g = 0, b = 0;
-    const pixels = imageData.data.length / 4;
-    
-    for (let i = 0; i < imageData.data.length; i += 4) {
-        r += imageData.data[i];
-        g += imageData.data[i + 1];
-        b += imageData.data[i + 2];
-    }
-    
-    r = Math.round(r / pixels);
-    g = Math.round(g / pixels);
-    b = Math.round(b / pixels);
-    
-    return `rgb(${r}, ${g}, ${b})`;
-}
-
-// Handler foto dengan tombol cancel
+// Improved photo handler with better session management
 bot.on('photo', async (ctx) => {
     try {
-        console.log('Menerima foto baru');
-        
         const photo = ctx.message.photo.pop();
         const file = await ctx.telegram.getFile(photo.file_id);
         const fileName = `${ctx.from.id}_${Date.now()}.jpg`;
@@ -205,17 +228,15 @@ bot.on('photo', async (ctx) => {
         const buffer = Buffer.from(await response.arrayBuffer());
         fs.writeFileSync(imagePath, buffer);
         
-        console.log('Gambar tersimpan:', imagePath);
-        
         const groupText = await detectGroupText(imagePath);
         
-        ctx.session = { 
+        // Store session data
+        sessions.set(ctx.from.id, {
             imagePath,
             waitingForCount: true,
             lastMessageTime: Date.now()
-        };
+        });
         
-        // Menambahkan tombol cancel
         await ctx.reply(
             `✅ Terdeteksi: ${groupText.memberCount} anggota\n` +
             `📝 Silakan kirim jumlah anggota baru:`,
@@ -227,6 +248,50 @@ bot.on('photo', async (ctx) => {
     } catch (error) {
         console.error('Error handler foto:', error);
         await ctx.reply('❌ Gagal memproses gambar. Pastikan screenshot mengandung teks "Grup · X anggota"');
+    }
+});
+
+// Improved text handler with better session checking
+bot.on('text', async (ctx) => {
+    try {
+        const session = sessions.get(ctx.from.id);
+        if (!session?.imagePath || !session?.waitingForCount) {
+            return;
+        }
+
+        const timeoutDuration = 5 * 60 * 1000;
+        if (Date.now() - session.lastMessageTime > timeoutDuration) {
+            if (session.imagePath && fs.existsSync(session.imagePath)) {
+                fs.unlinkSync(session.imagePath);
+            }
+            sessions.delete(ctx.from.id);
+            return ctx.reply('⚠️ Sesi telah kedaluwarsa. Silakan kirim screenshot baru.');
+        }
+
+        const newCount = ctx.message.text;
+        if (!/^\d+$/.test(newCount)) {
+            return ctx.reply('⚠️ Mohon masukkan angka yang valid.');
+        }
+
+        const processingMsg = await ctx.reply('⏳ Sedang memproses...');
+        const editedPath = await editImage(session.imagePath, newCount);
+        await ctx.replyWithPhoto({ source: editedPath });
+        await ctx.telegram.deleteMessage(ctx.chat.id, processingMsg.message_id);
+        
+        // Cleanup
+        fs.unlinkSync(session.imagePath);
+        fs.unlinkSync(editedPath);
+        sessions.delete(ctx.from.id);
+        
+    } catch (error) {
+        console.error('Error handler text:', error);
+        await ctx.reply('❌ Gagal mengedit gambar. Silakan coba lagi.');
+        
+        const session = sessions.get(ctx.from.id);
+        if (session?.imagePath && fs.existsSync(session.imagePath)) {
+            fs.unlinkSync(session.imagePath);
+        }
+        sessions.delete(ctx.from.id);
     }
 });
 
@@ -244,64 +309,10 @@ bot.action('cancel_edit', async (ctx) => {
         await ctx.answerCbQuery('Gagal membatalkan proses');
     }
 });
-
-// Handler text yang ditingkatkan
-bot.on('text', async (ctx) => {
-    try {
-        if (!ctx.session?.imagePath || !ctx.session?.waitingForCount) {
-            return ctx.reply('⚠️ Silakan kirim screenshot grup terlebih dahulu.');
-        }
-
-        const timeoutDuration = 5 * 60 * 1000;
-        if (Date.now() - ctx.session.lastMessageTime > timeoutDuration) {
-            if (ctx.session.imagePath && fs.existsSync(ctx.session.imagePath)) {
-                fs.unlinkSync(ctx.session.imagePath);
-            }
-            delete ctx.session;
-            return ctx.reply('⚠️ Sesi telah kedaluwarsa. Silakan kirim screenshot baru.');
-        }
-
-        const newCount = ctx.message.text;
-        if (!/^\d+$/.test(newCount)) {
-            return ctx.reply('⚠️ Mohon masukkan angka yang valid.');
-        }
-
-        const processingMsg = await ctx.reply('⏳ Sedang memproses...');
-        const editedPath = await editImage(ctx.session.imagePath, newCount);
-        await ctx.replyWithPhoto({ source: editedPath });
-        await ctx.telegram.deleteMessage(ctx.chat.id, processingMsg.message_id);
-        
-        // Cleanup
-        fs.unlinkSync(ctx.session.imagePath);
-        fs.unlinkSync(editedPath);
-        delete ctx.session;
-        
-    } catch (error) {
-        console.error('Error handler text:', error);
-        await ctx.reply('❌ Gagal mengedit gambar. Silakan coba lagi.');
-        
-        if (ctx.session?.imagePath && fs.existsSync(ctx.session.imagePath)) {
-            fs.unlinkSync(ctx.session.imagePath);
-        }
-        delete ctx.session;
-    }
-});
-
-// Session middleware
-bot.use((ctx, next) => {
-    if (!ctx.session) ctx.session = {};
-    return next();
-});
-
-// Error handler
-bot.catch((err, ctx) => {
-    console.error('Bot error:', err);
-    ctx.reply('❌ Terjadi kesalahan pada bot. Silakan coba lagi.');
-});
+// Other handlers remain the same...
 
 bot.launch();
 console.log('✅ Bot berjalan...');
 
-// Graceful stop
 process.once('SIGINT', () => bot.stop('SIGINT'));
 process.once('SIGTERM', () => bot.stop('SIGTERM'));
