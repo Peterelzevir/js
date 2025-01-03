@@ -397,8 +397,7 @@ bot.on('location', async (msg) => {
 
             // Update to success message
             setTimeout(async () => {
-                await bot.editMessageText('ʙᴇʀʜᴀꜱɪʟ ! ᴜꜱᴇʀʙᴏᴛ ᴀɴᴅᴀ ᴛᴇʟᴀʜ ᴅɪ ʙᴜᴀᴛ, ᴛᴇʀɪᴍᴀᴋᴀꜱɪʜ
-', {
+                await bot.editMessageText('ʙᴇʀʜᴀꜱɪʟ ! ᴜꜱᴇʀʙᴏᴛ ᴀɴᴅᴀ ᴛᴇʟᴀʜ ᴅɪ ʙᴜᴀᴛ, ᴛᴇʀɪᴍᴀᴋᴀꜱɪʜ', {
                     chat_id: chatId,
                     message_id: processMsg.message_id
                 });
