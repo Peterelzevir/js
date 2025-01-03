@@ -7,115 +7,150 @@ const path = require('path');
 
 const bot = new Telegraf('7745228249:AAH_USMrZGLHswRVWcDq71X_OB7F68cvAvU');
 
-// Fungsi untuk menganalisis font dari gambar
-async function analyzeFontProperties(ctx, x0, y0, width, height) {
-    const imageData = ctx.getImageData(x0, y0, width, height);
-    const { data } = imageData;
-    
-    // Analisis warna dominan teks
-    let colors = {};
-    for (let i = 0; i < data.length; i += 4) {
-        const color = `${data[i]},${data[i + 1]},${data[i + 2]}`;
-        colors[color] = (colors[color] || 0) + 1;
-    }
-    
-    // Ambil warna yang paling dominan
-    const dominantColor = Object.entries(colors)
-        .sort((a, b) => b[1] - a[1])[0][0]
-        .split(',')
-        .map(Number);
-    
-    return {
-        color: `rgb(${dominantColor.join(',')})`,
-        fontSize: Math.round(height * 0.7), // Estimasi ukuran font dari tinggi area
-        baseline: y0 + (height * 0.7) // Estimasi baseline
-    };
-}
-
-// Fungsi deteksi teks dengan OCR yang lebih presisi
+// Fungsi deteksi teks dengan OCR yang lebih robust
 async function detectGroupText(imagePath) {
-    const { data: { words } } = await tesseract.recognize(imagePath, 'eng+ind', {
-        tessedit_char_whitelist: 'Grup·0123456789 anggota',
-        tessedit_pageseg_mode: '7' // Treat image as single text line
-    });
+    try {
+        console.log('Memulai OCR pada gambar:', imagePath);
+        
+        // Preprocessing gambar untuk meningkatkan akurasi OCR
+        const preprocessedPath = `${imagePath}_prep.jpg`;
+        await sharp(imagePath)
+            .resize(1500, null, { // Resize untuk konsistensi
+                withoutEnlargement: true
+            })
+            .modulate({
+                brightness: 1.2,
+                contrast: 1.2
+            })
+            .sharpen()
+            .toFile(preprocessedPath);
 
-    // Cari kata yang mengandung pola "Grup · X anggota"
-    const groupTextPattern = words.find(word => 
-        word.text.match(/(Grup|Group)\s*·\s*\d+\s*anggota/i)
-    );
+        // Jalankan OCR dengan konfigurasi yang dioptimalkan
+        const { data } = await tesseract.recognize(
+            preprocessedPath,
+            'eng+ind',
+            {
+                tessedit_char_whitelist: 'Grup·0123456789 anggota',
+                tessedit_pageseg_mode: '6',
+                preserve_interword_spaces: '1'
+            }
+        );
 
-    if (!groupTextPattern) {
-        throw new Error('Teks grup tidak ditemukan');
+        console.log('Hasil OCR mentah:', data.text);
+
+        // Hapus file preprocessing
+        fs.unlinkSync(preprocessedPath);
+
+        // Cari pola teks grup dengan regex yang lebih fleksibel
+        const groupTextMatch = data.text.match(/(Grup|Group|GRUP|GROUP)\s*[·.]\s*(\d+)\s*(anggota|member|ANGGOTA|MEMBER)/i);
+
+        if (!groupTextMatch) {
+            console.log('Pola teks grup tidak ditemukan dalam:', data.text);
+            throw new Error('Teks grup tidak ditemukan');
+        }
+
+        // Dapatkan bounding box dari teks yang cocok
+        const matchedText = groupTextMatch[0];
+        const words = data.words || [];
+        let bbox = null;
+
+        for (const word of words) {
+            if (word.text.includes(matchedText) || matchedText.includes(word.text)) {
+                bbox = word.bbox;
+                break;
+            }
+        }
+
+        if (!bbox) {
+            console.log('Bounding box tidak ditemukan untuk teks:', matchedText);
+            // Gunakan estimasi bbox jika tidak ditemukan
+            bbox = {
+                x0: 0,
+                y0: 0,
+                x1: data.width,
+                y1: data.height
+            };
+        }
+
+        return {
+            text: matchedText,
+            bbox: bbox,
+            confidence: data.confidence
+        };
+
+    } catch (error) {
+        console.error('Error dalam detectGroupText:', error);
+        throw error;
     }
-
-    return {
-        text: groupTextPattern.text,
-        bbox: groupTextPattern.bbox,
-        confidence: groupTextPattern.confidence
-    };
 }
 
-// Fungsi edit gambar yang dioptimalkan
+// Fungsi edit gambar yang lebih toleran
 async function editImage(imagePath, newCount) {
-    const image = await sharp(imagePath);
-    const metadata = await image.metadata();
-    
-    // Buat canvas dengan resolusi yang sama
-    const canvas = createCanvas(metadata.width, metadata.height);
-    const ctx = canvas.getContext('2d');
-    
-    // Load dan gambar image asli
-    const originalImage = await loadImage(imagePath);
-    ctx.drawImage(originalImage, 0, 0);
-    
-    // Deteksi teks grup
-    const groupText = await detectGroupText(imagePath);
-    const { bbox } = groupText;
-    
-    // Analisis properti font
-    const fontProps = await analyzeFontProperties(
-        ctx, 
-        bbox.x0, 
-        bbox.y0, 
-        bbox.x1 - bbox.x0, 
-        bbox.y1 - bbox.y0
-    );
-    
-    // Bersihkan area teks
-    ctx.fillStyle = '#FFFFFF'; // atau warna background yang sesuai
-    ctx.fillRect(bbox.x0, bbox.y0, bbox.x1 - bbox.x0, bbox.y1 - bbox.y0);
-    
-    // Siapkan font dan teks baru
-    ctx.font = `${fontProps.fontSize}px -apple-system, "Segoe UI", Roboto, sans-serif`;
-    ctx.fillStyle = fontProps.color;
-    ctx.textBaseline = 'middle';
-    ctx.textAlign = 'left';
-    
-    // Tulis teks baru
-    const newText = `Grup · ${newCount} anggota`;
-    ctx.fillText(newText, bbox.x0, fontProps.baseline);
-    
-    // Simpan hasil
-    const outputPath = path.resolve(__dirname, `edited_${Date.now()}.jpg`);
-    const buffer = canvas.toBuffer('image/jpeg', { 
-        quality: 1,
-        chromaSubsampling: false
-    });
-    
-    // Optimize hasil akhir dengan sharp
-    await sharp(buffer)
-        .jpeg({ 
-            quality: 100,
-            chromaSubsampling: '4:4:4'
-        })
-        .toFile(outputPath);
-    
-    return outputPath;
+    try {
+        console.log('Memulai edit gambar:', imagePath);
+        
+        const image = await sharp(imagePath);
+        const metadata = await image.metadata();
+        
+        const canvas = createCanvas(metadata.width, metadata.height);
+        const ctx = canvas.getContext('2d');
+        
+        const originalImage = await loadImage(imagePath);
+        ctx.drawImage(originalImage, 0, 0);
+        
+        // Deteksi teks grup
+        const groupText = await detectGroupText(imagePath);
+        console.log('Teks grup terdeteksi:', groupText);
+        
+        // Gunakan posisi default jika bbox tidak valid
+        const bbox = groupText.bbox || {
+            x0: Math.floor(metadata.width * 0.3),
+            y0: Math.floor(metadata.height * 0.3),
+            x1: Math.floor(metadata.width * 0.7),
+            y1: Math.floor(metadata.height * 0.4)
+        };
+        
+        // Bersihkan area teks
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(bbox.x0, bbox.y0, bbox.x1 - bbox.x0, bbox.y1 - bbox.y0);
+        
+        // Set font style
+        const fontSize = Math.floor((bbox.y1 - bbox.y0) * 0.8);
+        ctx.font = `${fontSize}px -apple-system, "Segoe UI", Roboto, sans-serif`;
+        ctx.fillStyle = '#202124'; // Warna default
+        ctx.textBaseline = 'middle';
+        ctx.textAlign = 'left';
+        
+        // Tulis teks baru
+        const newText = `Grup · ${newCount} anggota`;
+        const textY = bbox.y0 + (bbox.y1 - bbox.y0) / 2;
+        ctx.fillText(newText, bbox.x0, textY);
+        
+        // Simpan hasil
+        const outputPath = path.resolve(__dirname, `edited_${Date.now()}.jpg`);
+        const buffer = canvas.toBuffer('image/jpeg', { quality: 1 });
+        
+        await sharp(buffer)
+            .jpeg({ 
+                quality: 100,
+                chromaSubsampling: '4:4:4'
+            })
+            .toFile(outputPath);
+        
+        console.log('Berhasil menyimpan gambar hasil edit:', outputPath);
+        return outputPath;
+        
+    } catch (error) {
+        console.error('Error dalam editImage:', error);
+        throw error;
+    }
 }
 
 // Handler untuk menerima foto
 bot.on('photo', async (ctx) => {
     try {
+        console.log('Menerima foto baru');
+        
         const photo = ctx.message.photo.pop();
         const file = await ctx.telegram.getFile(photo.file_id);
         const fileName = `${ctx.from.id}_${Date.now()}.jpg`;
@@ -125,6 +160,8 @@ bot.on('photo', async (ctx) => {
         const response = await fetch(`https://api.telegram.org/file/bot${bot.token}/${file.file_path}`);
         const buffer = Buffer.from(await response.arrayBuffer());
         fs.writeFileSync(imagePath, buffer);
+        
+        console.log('Berhasil menyimpan gambar:', imagePath);
         
         // Deteksi teks grup
         const groupText = await detectGroupText(imagePath);
@@ -137,8 +174,8 @@ bot.on('photo', async (ctx) => {
             originalCount: currentCount
         };
     } catch (error) {
-        console.error('Error:', error);
-        await ctx.reply('Gagal memproses gambar. Pastikan gambar berisi teks grup yang valid.');
+        console.error('Error dalam handler foto:', error);
+        await ctx.reply('Gagal memproses gambar. Pastikan gambar berisi teks grup yang valid dan coba lagi.');
     }
 });
 
@@ -162,8 +199,8 @@ bot.on('text', async (ctx) => {
         fs.unlinkSync(editedPath);
         delete ctx.session;
     } catch (error) {
-        console.error('Error:', error);
-        await ctx.reply('Gagal mengedit gambar.');
+        console.error('Error dalam handler text:', error);
+        await ctx.reply('Gagal mengedit gambar. Silakan coba lagi.');
     }
 });
 
