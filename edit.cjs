@@ -105,66 +105,121 @@ async function detectGroupText(imagePath) {
     }
 }
 
+// Fungsi untuk mendeteksi properti font dan warna berdasarkan background
 async function detectFontProperties(imagePath, bbox) {
-    const image = await sharp(imagePath);
-    const metadata = await image.metadata();
-    const region = await image
-        .extract({
-            left: bbox.x0,
-            top: bbox.y0,
-            width: bbox.x1 - bbox.x0,
-            height: bbox.y1 - bbox.y0
-        })
-        .toBuffer();
+    try {
+        const image = await sharp(imagePath);
+        const region = await image
+            .extract({
+                left: bbox.x0,
+                top: bbox.y0,
+                width: bbox.x1 - bbox.x0,
+                height: bbox.y1 - bbox.y0
+            })
+            .toBuffer();
+            
+        const stats = await sharp(region).stats();
+        
+        // Analisis warna background
+        const channels = stats.channels;
+        const brightness = (channels[0].mean + channels[1].mean + channels[2].mean) / 3;
+        const contrast = Math.max(...channels.map(c => c.std));
+        
+        // Tentukan warna text berdasarkan background
+        const textColor = brightness > 127 ? '#202124' : '#FFFFFF';
+        
+        // Tentukan ukuran font yang optimal
+        const fontSize = Math.floor((bbox.y1 - bbox.y0) * 0.75);
+        const adjustedFontSize = Math.min(Math.max(fontSize, 12), 32); // Batasi ukuran font
+        
+        return {
+            color: textColor,
+            fontSize: adjustedFontSize,
+            brightness,
+            contrast
+        };
+    } catch (error) {
+        console.error('Error in detectFontProperties:', error);
+        throw error;
+    }
+}
 
-    const stats = await sharp(region).stats();
-    const brightness = (stats.channels[0].mean + stats.channels[1].mean + stats.channels[2].mean) / 3;
+// Fungsi untuk mengoptimalkan posisi teks
+function optimizeTextPosition(bbox, fontSize, text, canvasWidth) {
+    const padding = Math.floor(fontSize * 0.2);
+    const x = Math.max(bbox.x0, padding);
+    const width = Math.min(bbox.x1 - x, canvasWidth - x - padding);
     
     return {
-        color: brightness > 127 ? '#FFFFFF' : '#202124',
-        fontSize: Math.floor((bbox.y1 - bbox.y0) * 0.75)
+        x,
+        y: bbox.y0 + (bbox.y1 - bbox.y0) / 2,
+        width
     };
 }
 
-// Fungsi edit gambar
-async function editImage(imagePath, newCount) {
+// Fungsi utama untuk edit gambar
+async function editImage(imagePath, newCount, options = {}) {
     try {
+        // Load dan analisis gambar
         const image = await sharp(imagePath);
         const metadata = await image.metadata();
         
         const canvas = createCanvas(metadata.width, metadata.height);
         const ctx = canvas.getContext('2d');
         
+        // Load gambar original
         const originalImage = await loadImage(imagePath);
         ctx.drawImage(originalImage, 0, 0);
         
+        // Deteksi area teks
         const groupText = await detectGroupText(imagePath);
         console.log('Detected group text:', groupText);
         
         const { bbox } = groupText;
         
-        // Clear text area
-        ctx.fillStyle = '#FFFFFF';
-        ctx.fillRect(bbox.x0, bbox.y0, bbox.x1 - bbox.x0, bbox.y1 - bbox.y0);
+        // Deteksi properti font
+        const fontProps = await detectFontProperties(imagePath, bbox);
         
-        // Set text style
-        const fontSize = Math.floor((bbox.y1 - bbox.y0) * 0.8);
-        ctx.font = `${fontSize}px -apple-system, "Segoe UI", Roboto, sans-serif`;
-        ctx.fillStyle = '#202124';
+        // Clear area teks dengan blur effect
+        const blurRadius = 3;
+        ctx.filter = `blur(${blurRadius}px)`;
+        ctx.drawImage(originalImage, 
+            bbox.x0, bbox.y0, bbox.x1 - bbox.x0, bbox.y1 - bbox.y0,
+            bbox.x0, bbox.y0, bbox.x1 - bbox.x0, bbox.y1 - bbox.y0
+        );
+        ctx.filter = 'none';
+        
+        // Setup style teks
+        const newText = `Grup · ${newCount} anggota`;
+        ctx.font = `${fontProps.fontSize}px -apple-system, "Segoe UI", Roboto, sans-serif`;
+        ctx.fillStyle = fontProps.color;
         ctx.textBaseline = 'middle';
         
-        // Write new text
-        const newText = `Grup · ${newCount} anggota`;
-        const textY = bbox.y0 + (bbox.y1 - bbox.y0) / 2;
-        ctx.fillText(newText, bbox.x0, textY);
+        // Optimasi posisi teks
+        const textPos = optimizeTextPosition(bbox, fontProps.fontSize, newText, metadata.width);
         
-        // Save result
+        // Tambah shadow jika background terang
+        if (fontProps.brightness > 200) {
+            ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
+            ctx.shadowBlur = 2;
+            ctx.shadowOffsetX = 1;
+            ctx.shadowOffsetY = 1;
+        }
+        
+        // Tulis teks
+        ctx.fillText(newText, textPos.x, textPos.y, textPos.width);
+        
+        // Reset shadow
+        ctx.shadowColor = 'transparent';
+        
+        // Simpan hasil
         const outputPath = path.resolve(__dirname, `edited_${Date.now()}.jpg`);
-        const buffer = canvas.toBuffer('image/jpeg', { quality: 1 });
+        const buffer = canvas.toBuffer('image/jpeg');
         
+        // Optimize output quality
         await sharp(buffer)
             .jpeg({ 
-                quality: 100,
+                quality: 95,
                 chromaSubsampling: '4:4:4'
             })
             .toFile(outputPath);
@@ -176,7 +231,6 @@ async function editImage(imagePath, newCount) {
         throw error;
     }
 }
-
 // Handler foto
 bot.on('photo', async (ctx) => {
     try {
