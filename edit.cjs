@@ -105,8 +105,53 @@ async function detectGroupText(imagePath) {
     }
 }
 
-// Fungsi untuk mendeteksi properti font dan warna berdasarkan background
+// Fungsi untuk mendeteksi properti font dan warna
 async function detectFontProperties(imagePath, bbox) {
+    try {
+        const image = await sharp(imagePath);
+        const metadata = await image.metadata();
+        
+        // Validasi bbox
+        const x0 = Math.max(0, Math.floor(bbox.x0));
+        const y0 = Math.max(0, Math.floor(bbox.y0));
+        const x1 = Math.min(metadata.width, Math.floor(bbox.x1));
+        const y1 = Math.min(metadata.height, Math.floor(bbox.y1));
+        
+        const width = x1 - x0;
+        const height = y1 - y0;
+        
+        if (width <= 0 || height <= 0) {
+            throw new Error('Invalid bbox dimensions');
+        }
+        
+        const region = await image
+            .extract({
+                left: x0,
+                top: y0,
+                width: width,
+                height: height
+            })
+            .toBuffer();
+            
+        const stats = await sharp(region).stats();
+        
+        // Analisis warna
+        const avgBrightness = stats.channels.reduce((sum, channel) => sum + channel.mean, 0) / 3;
+        const textColor = avgBrightness > 127 ? '#202124' : '#FFFFFF';
+        
+        return {
+            color: textColor,
+            fontSize: Math.max(12, Math.min(32, Math.floor(height * 0.8))),
+            brightness: avgBrightness
+        };
+    } catch (error) {
+        console.error('Error in detectFontProperties:', error);
+        throw error;
+    }
+}
+
+// Fungsi untuk mendapatkan warna background yang tepat
+async function getBackgroundColor(imagePath, bbox) {
     try {
         const image = await sharp(imagePath);
         const region = await image
@@ -116,114 +161,120 @@ async function detectFontProperties(imagePath, bbox) {
                 width: bbox.x1 - bbox.x0,
                 height: bbox.y1 - bbox.y0
             })
+            .raw()
             .toBuffer();
             
-        const stats = await sharp(region).stats();
+        let r = 0, g = 0, b = 0;
+        const pixelCount = region.length / 3;
         
-        // Analisis warna background
-        const channels = stats.channels;
-        const brightness = (channels[0].mean + channels[1].mean + channels[2].mean) / 3;
-        const contrast = Math.max(...channels.map(c => c.std));
-        
-        // Tentukan warna text berdasarkan background
-        const textColor = brightness > 127 ? '#202124' : '#FFFFFF';
-        
-        // Tentukan ukuran font yang optimal
-        const fontSize = Math.floor((bbox.y1 - bbox.y0) * 0.75);
-        const adjustedFontSize = Math.min(Math.max(fontSize, 12), 32); // Batasi ukuran font
+        for (let i = 0; i < region.length; i += 3) {
+            r += region[i];
+            g += region[i + 1];
+            b += region[i + 2];
+        }
         
         return {
-            color: textColor,
-            fontSize: adjustedFontSize,
-            brightness,
-            contrast
+            r: Math.round(r / pixelCount),
+            g: Math.round(g / pixelCount),
+            b: Math.round(b / pixelCount)
         };
     } catch (error) {
-        console.error('Error in detectFontProperties:', error);
+        console.error('Error in getBackgroundColor:', error);
         throw error;
     }
 }
 
-// Fungsi untuk mengoptimalkan posisi teks
-function optimizeTextPosition(bbox, fontSize, text, canvasWidth) {
-    const padding = Math.floor(fontSize * 0.2);
-    const x = Math.max(bbox.x0, padding);
-    const width = Math.min(bbox.x1 - x, canvasWidth - x - padding);
+// Fungsi untuk mendapatkan posisi angka yang tepat
+function getNumberPosition(bbox, originalText, newText, fontSize) {
+    const width = bbox.x1 - bbox.x0;
+    const height = bbox.y1 - bbox.y0;
     
     return {
-        x,
-        y: bbox.y0 + (bbox.y1 - bbox.y0) / 2,
-        width
+        x: bbox.x0 + width / 2,
+        y: bbox.y0 + height / 2,
+        width: width,
+        height: height
     };
 }
 
 // Fungsi utama untuk edit gambar
-async function editImage(imagePath, newCount, options = {}) {
+async function editImage(imagePath, newCount) {
     try {
-        // Load dan analisis gambar
         const image = await sharp(imagePath);
         const metadata = await image.metadata();
+        
+        // Deteksi teks grup menggunakan fungsi yang sudah ada
+        const groupText = await detectGroupText(imagePath);
+        console.log('Detected group text:', groupText);
+        
+        if (!groupText || !groupText.bbox) {
+            throw new Error('Failed to detect group text area');
+        }
         
         const canvas = createCanvas(metadata.width, metadata.height);
         const ctx = canvas.getContext('2d');
         
-        // Load gambar original
+        // Load dan gambar image original
         const originalImage = await loadImage(imagePath);
         ctx.drawImage(originalImage, 0, 0);
         
-        // Deteksi area teks
-        const groupText = await detectGroupText(imagePath);
-        console.log('Detected group text:', groupText);
+        // Dapatkan properti font dan warna
+        const fontProps = await detectFontProperties(imagePath, groupText.bbox);
         
-        const { bbox } = groupText;
+        // Dapatkan warna background
+        const bgColor = await getBackgroundColor(imagePath, groupText.bbox);
         
-        // Deteksi properti font
-        const fontProps = await detectFontProperties(imagePath, bbox);
-        
-        // Clear area teks dengan blur effect
-        const blurRadius = 3;
-        ctx.filter = `blur(${blurRadius}px)`;
-        ctx.drawImage(originalImage, 
-            bbox.x0, bbox.y0, bbox.x1 - bbox.x0, bbox.y1 - bbox.y0,
-            bbox.x0, bbox.y0, bbox.x1 - bbox.x0, bbox.y1 - bbox.y0
+        // Hitung posisi untuk angka baru
+        const numPos = getNumberPosition(
+            groupText.bbox, 
+            groupText.memberCount.toString(), 
+            newCount.toString(), 
+            fontProps.fontSize
         );
-        ctx.filter = 'none';
         
-        // Setup style teks
-        const newText = `Grup · ${newCount} anggota`;
+        // Bersihkan area angka dengan warna background
+        ctx.fillStyle = `rgb(${bgColor.r}, ${bgColor.g}, ${bgColor.b})`;
+        ctx.fillRect(
+            numPos.x - (numPos.width / 2),
+            numPos.y - (numPos.height / 2),
+            numPos.width,
+            numPos.height
+        );
+        
+        // Setup style untuk angka baru
         ctx.font = `${fontProps.fontSize}px -apple-system, "Segoe UI", Roboto, sans-serif`;
         ctx.fillStyle = fontProps.color;
         ctx.textBaseline = 'middle';
-        
-        // Optimasi posisi teks
-        const textPos = optimizeTextPosition(bbox, fontProps.fontSize, newText, metadata.width);
+        ctx.textAlign = 'center';
         
         // Tambah shadow jika background terang
         if (fontProps.brightness > 200) {
-            ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
-            ctx.shadowBlur = 2;
-            ctx.shadowOffsetX = 1;
-            ctx.shadowOffsetY = 1;
+            ctx.shadowColor = 'rgba(0, 0, 0, 0.2)';
+            ctx.shadowBlur = 1;
+            ctx.shadowOffsetX = 0.5;
+            ctx.shadowOffsetY = 0.5;
         }
         
-        // Tulis teks
-        ctx.fillText(newText, textPos.x, textPos.y, textPos.width);
+        // Tulis angka baru
+        ctx.fillText(newCount.toString(), numPos.x, numPos.y);
         
         // Reset shadow
         ctx.shadowColor = 'transparent';
+        ctx.shadowBlur = 0;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 0;
         
         // Simpan hasil
         const outputPath = path.resolve(__dirname, `edited_${Date.now()}.jpg`);
         const buffer = canvas.toBuffer('image/jpeg');
         
-        // Optimize output quality
         await sharp(buffer)
             .jpeg({ 
-                quality: 95,
+                quality: 100,
                 chromaSubsampling: '4:4:4'
             })
             .toFile(outputPath);
-        
+            
         return outputPath;
         
     } catch (error) {
@@ -294,7 +345,7 @@ bot.on('text', async (ctx) => {
             return;
         }
 
-        const timeoutDuration = 5 * 60 * 1000; // 5 menit
+        const timeoutDuration = 1 * 60 * 1000; // 5 menit
         if (Date.now() - session.lastMessageTime > timeoutDuration) {
             if (session.imagePath && fs.existsSync(session.imagePath)) {
                 fs.unlinkSync(session.imagePath);
