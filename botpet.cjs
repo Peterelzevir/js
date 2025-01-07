@@ -482,7 +482,7 @@ async function start() {
     const sock = makeWASocket({
         printQRInTerminal: true,
         auth: state,
-        logger: P({ level: 'silent' }),
+        logger: pino({ level: 'silent' }),
         browser: ['By Pet', 'Safari', '3.0'],
         auth: {
             creds: state.creds,
