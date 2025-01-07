@@ -475,7 +475,6 @@ const handleCloneConnection = async (connection, cloneSock, sock, from, number, 
     }
 }
 
-// Start Bot Function
 async function startBot() {
     console.log(ASCII_ART)
     console.log('\nWelcome to Pinemark WhatsApp Bot!\n')
@@ -491,98 +490,121 @@ async function startBot() {
                 let qrRetries = 0;
                 let pairingRetries = 0;
                 const maxRetries = 3;
+                let isConnecting = false;
 
                 const connectToWhatsApp = async () => {
-                    sock = makeWASocket({
-                        printQRInTerminal: true,
-                        auth: state,
-                        logger: pino({ level: 'silent' }),
-                        browser: [BOT_NAME, 'Safari', ''],
-                        connectTimeoutMs: 60000,
-                        defaultQueryTimeoutMs: 60000,
-                        keepAliveIntervalMs: 10000
-                    });
+                    if (isConnecting) return; // Prevent multiple connection attempts
+                    isConnecting = true;
 
-                    // Connection Update Handler
-                    sock.ev.on('connection.update', async ({ connection, lastDisconnect, qr }) => {
-                        if(connection === 'close') {
-                            const statusCode = (lastDisconnect?.error instanceof Boom)?.output?.statusCode;
-                            const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
-                            
-                            console.log('Connection closed due to ', lastDisconnect?.error?.message);
-                            
-                            if(shouldReconnect) {
-                                if (choice === '1' && qrRetries < maxRetries) {
-                                    console.log(`QR Code expired, retrying... (${qrRetries + 1}/${maxRetries})`);
-                                    qrRetries++;
-                                    await connectToWhatsApp();
-                                } 
-                                else if (choice === '2' && pairingRetries < maxRetries) {
-                                    console.log(`Pairing code expired, generating new code... (${pairingRetries + 1}/${maxRetries})`);
-                                    pairingRetries++;
-                                    await connectToWhatsApp();
-                                    // Generate new pairing code
-                                    setTimeout(async () => {
-                                        try {
-                                            const code = await sock.requestPairingCode(number);
-                                            console.log(`
+                    try {
+                        sock = makeWASocket({
+                            auth: state,
+                            printQRInTerminal: choice === '1',
+                            logger: pino({ level: 'silent' }),
+                            browser: [BOT_NAME, 'Safari', ''],
+                            connectTimeoutMs: 60000,
+                            defaultQueryTimeoutMs: 60000,
+                            keepAliveIntervalMs: 10000,
+                            retryRequestDelayMs: 5000,
+                            mobile: false,
+                            version: [2, 2323, 4],
+                        });
+
+                        sock.ev.on('connection.update', async ({ connection, lastDisconnect, qr }) => {
+                            if (connection === 'close') {
+                                isConnecting = false;
+                                const statusCode = lastDisconnect?.error?.output?.statusCode;
+                                const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
+                                
+                                console.log('\nConnection closed due to:', lastDisconnect?.error?.message || 'unknown error');
+                                
+                                if (shouldReconnect) {
+                                    if (choice === '1' && qrRetries < maxRetries) {
+                                        qrRetries++;
+                                        console.log(`\nRetrying QR connection... (${qrRetries}/${maxRetries})`);
+                                        setTimeout(connectToWhatsApp, 5000);
+                                    } 
+                                    else if (choice === '2' && pairingRetries < maxRetries) {
+                                        pairingRetries++;
+                                        console.log(`\nRetrying pairing connection... (${pairingRetries}/${maxRetries})`);
+                                        
+                                        // Add delay before reconnecting
+                                        setTimeout(async () => {
+                                            await connectToWhatsApp();
+                                            
+                                            // Generate new pairing code after reconnection attempt
+                                            setTimeout(async () => {
+                                                try {
+                                                    const code = await sock.requestPairingCode(number);
+                                                    console.log(`
 ╭━━━━━━━━━━━━━━━━━━━━━╮
 ┃   NEW PAIRING CODE   ┃
 ┃━━━━━━━━━━━━━━━━━━━━━┃
 ┃ Code: ${code}        ┃
-╰━━━━━━━━━━━━━━━━━━━━━╯
-`);
-                                        } catch (error) {
-                                            console.error('Failed to generate new pairing code:', error);
-                                        }
-                                    }, 3000);
+╰━━━━━━━━━━━━━━━━━━━━━╯`);
+                                                } catch (error) {
+                                                    console.error('Failed to generate pairing code:', error.message);
+                                                }
+                                            }, 3000);
+                                        }, 5000);
+                                    }
+                                    else {
+                                        console.log('\nMax retries reached. Please restart the bot.');
+                                        process.exit(1);
+                                    }
+                                } else {
+                                    console.log('Connection closed. You are logged out.');
+                                    process.exit(0);
                                 }
-                                else {
-                                    console.log('Max retries reached. Please restart the bot.');
-                                    process.exit(1);
-                                }
-                            } else {
-                                console.log('Connection closed. You are logged out.');
-                                process.exit(0);
-                            }
-                        } else if(connection === 'open') {
-                            console.log(`
+                            } else if (connection === 'open') {
+                                isConnecting = false;
+                                console.clear();
+                                console.log(`
 ╭━━━━━━━━━━━━━━━━━━━━━╮
 ┃   PINEMARK CONNECTED! ┃
 ┃━━━━━━━━━━━━━━━━━━━━━┃
 ┃ Status : Online      ┃
 ┃ Number : ${number}   ┃
 ┃ Name   : ${BOT_NAME} ┃
-╰━━━━━━━━━━━━━━━━━━━━━╯
-`);
-                            // Reset retries on successful connection
-                            qrRetries = 0;
-                            pairingRetries = 0;
-                        }
-                        
-                        // Handle QR code generation
-                        if(choice === '1' && qr) {
-                            console.log('Scan this QR code to login:');
-                            if (qrRetries > 0) {
-                                console.log(`(Attempt ${qrRetries + 1}/${maxRetries})`);
+╰━━━━━━━━━━━━━━━━━━━━━╯`);
+                                qrRetries = 0;
+                                pairingRetries = 0;
+                            } else if (connection === 'connecting') {
+                                console.log('\nConnecting to WhatsApp...');
                             }
-                        }
-                    });
+                            
+                            if (choice === '1' && qr) {
+                                console.clear();
+                                console.log('Scan this QR code to login:');
+                                if (qrRetries > 0) {
+                                    console.log(`(Attempt ${qrRetries + 1}/${maxRetries})`);
+                                }
+                            }
+                        });
 
-                    // Credentials Update Handler
-                    sock.ev.on('creds.update', saveCreds);
-                    
-                    // Message Handler
-                    sock.ev.on('messages.upsert', messageHandler(sock));
+                        sock.ev.on('creds.update', saveCreds);
+                        sock.ev.on('messages.upsert', messageHandler(sock));
+                        
+                        // Add error handler
+                        process.on('uncaughtException', (err) => {
+                            console.log('Uncaught Exception:', err);
+                            isConnecting = false;
+                            if (err?.output?.statusCode !== DisconnectReason.loggedOut) {
+                                setTimeout(connectToWhatsApp, 3000);
+                            }
+                        });
 
-                    return sock;
+                        return sock;
+                    } catch (err) {
+                        console.error('Connection error:', err);
+                        isConnecting = false;
+                        setTimeout(connectToWhatsApp, 3000);
+                    }
                 };
 
-                // Initial connection
                 sock = await connectToWhatsApp();
 
-                // Generate initial pairing code if selected
-                if(choice === '2') {
+                if (choice === '2') {
                     setTimeout(async () => {
                         try {
                             const code = await sock.requestPairingCode(number);
@@ -591,16 +613,15 @@ async function startBot() {
 ┃   PAIRING CODE       ┃
 ┃━━━━━━━━━━━━━━━━━━━━━┃
 ┃ Code: ${code}        ┃
-╰━━━━━━━━━━━━━━━━━━━━━╯
-`);
+╰━━━━━━━━━━━━━━━━━━━━━╯`);
                         } catch (error) {
-                            console.error('Failed to generate pairing code:', error);
+                            console.error('Failed to generate initial pairing code:', error.message);
                             if (pairingRetries < maxRetries) {
-                                console.log(`Retrying to generate pairing code... (${pairingRetries + 1}/${maxRetries})`);
+                                console.log(`\nRetrying to generate pairing code... (${pairingRetries + 1}/${maxRetries})`);
                                 pairingRetries++;
-                                await connectToWhatsApp();
+                                setTimeout(connectToWhatsApp, 3000);
                             } else {
-                                console.log('Max retries reached. Please restart the bot.');
+                                console.log('\nMax retries reached. Please restart the bot.');
                                 process.exit(1);
                             }
                         }
@@ -615,5 +636,4 @@ async function startBot() {
     });
 }
 
-// Initial Start
 startBot();
