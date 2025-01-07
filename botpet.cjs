@@ -476,164 +476,49 @@ const handleCloneConnection = async (connection, cloneSock, sock, from, number, 
     }
 }
 
-async function startBot() {
-    console.log(ASCII_ART)
-    console.log('\nWelcome to Pinemark WhatsApp Bot!\n')
+async function start() {
+    const { state, saveCreds } = await useMultiFileAuthState('auth_info_baileys')
     
-    rl.question('Enter your phone number (with country code): ', async (number) => {
-        console.log('\nProcessing...')
+    const sock = makeWASocket({
+        printQRInTerminal: true,
+        auth: state,
+        logger: P({ level: 'silent' }),
+        browser: ['By Pet', 'Safari', '3.0'],
+        auth: {
+            creds: state.creds,
+            keys: makeCacheableSignalKeyStore(state.keys, P({ level: 'silent' })),
+        },
+    })
+
+    sock.ev.on('creds.update', saveCreds)
+
+    sock.ev.on('connection.update', (update) => {
+        const { connection, lastDisconnect } = update
         
-        rl.question('\nChoose login method:\n1. QR Code\n2. Pairing Code\nEnter choice (1/2): ', async (choice) => {
-            try {
-                // Clear existing session
-                const sessionDir = path.join(SESSION_DIR, 'By Pet')
-                require('fs').rmSync(sessionDir, { recursive: true, force: true })
-                
-                const { state, saveCreds } = await useMultiFileAuthState(sessionDir)
-                
-                let sock = null;
-                let qrRetries = 0;
-                let pairingRetries = 0;
-                const maxRetries = 3;
-                let isConnecting = false;
-
-                const connectToWhatsApp = async () => {
-                    if (isConnecting) return;
-                    isConnecting = true;
-
-                    try {
-                        sock = makeWASocket({
-                            auth: state,
-                            printQRInTerminal: false, // We'll handle QR display ourselves
-                            logger: pino({ level: 'silent' }),
-                            browser: [BOT_NAME, 'Safari', ''],
-                            connectTimeoutMs: 30000,
-                            defaultQueryTimeoutMs: 30000,
-                            keepAliveIntervalMs: 10000,
-                            retryRequestDelayMs: 3000,
-                            version: [2, 2323, 4],
-                            qrTimeout: 40000,
-                            emitOwnEvents: true,
-                            fireInitQueries: true,
-                            auth: {
-                                creds: state.creds,
-                                keys: state.keys,
-                            }
-                        });
-
-                        sock.ev.on('connection.update', async ({ connection, lastDisconnect, qr }) => {
-                            if (connection === 'close') {
-                                isConnecting = false;
-                                const statusCode = (lastDisconnect?.error instanceof Boom)?.output?.statusCode;
-                                const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
-                                
-                                console.log('\nConnection closed due to:', lastDisconnect?.error?.message || 'unknown error');
-                                
-                                if (shouldReconnect) {
-                                    if (choice === '1' && qrRetries < maxRetries) {
-                                        qrRetries++;
-                                        console.log(`\nRetrying QR connection... (${qrRetries}/${maxRetries})`);
-                                        setTimeout(connectToWhatsApp, 3000);
-                                    } 
-                                    else if (choice === '2' && pairingRetries < maxRetries) {
-                                        pairingRetries++;
-                                        console.log(`\nRetrying pairing connection... (${pairingRetries}/${maxRetries})`);
-                                        setTimeout(connectToWhatsApp, 3000);
-                                    }
-                                    else {
-                                        console.log('\nMax retries reached. Please restart the bot.');
-                                        process.exit(1);
-                                    }
-                                } else {
-                                    console.log('Connection closed. You are logged out.');
-                                    process.exit(0);
-                                }
-                            } else if (connection === 'open') {
-                                isConnecting = false;
-                                console.clear();
-                                console.log(`
-╭━━━━━━━━━━━━━━━━━━━━━╮
-┃   PINEMARK CONNECTED! ┃
-┃━━━━━━━━━━━━━━━━━━━━━┃
-┃ Status : Online      ┃
-┃ Number : ${number}   ┃
-┃ Name   : ${BOT_NAME} ┃
-╰━━━━━━━━━━━━━━━━━━━━━╯`);
-                                qrRetries = 0;
-                                pairingRetries = 0;
-                            } else if (connection === 'connecting') {
-                                console.log('\nConnecting to WhatsApp...');
-                            }
-                            
-                            // Handle QR code
-                            if (choice === '1' && qr) {
-                                console.clear();
-                                console.log('\nScan this QR code to login:');
-                                if (qrRetries > 0) {
-                                    console.log(`(Attempt ${qrRetries + 1}/${maxRetries})`);
-                                }
-                                qrcode.generate(qr, { small: true });
-                            }
-                        });
-
-                        sock.ev.on('creds.update', saveCreds);
-                        sock.ev.on('messages.upsert', messageHandler(sock));
-
-                        // Global error handler
-                        process.on('uncaughtException', (err) => {
-                            console.log('Uncaught Exception:', err);
-                            isConnecting = false;
-                            if (!(err instanceof Boom) || err?.output?.statusCode !== DisconnectReason.loggedOut) {
-                                setTimeout(connectToWhatsApp, 3000);
-                            }
-                        });
-
-                        return sock;
-                    } catch (err) {
-                        console.error('Connection error:', err);
-                        isConnecting = false;
-                        setTimeout(connectToWhatsApp, 3000);
-                        return null;
-                    }
-                };
-
-                // Initial connection
-                sock = await connectToWhatsApp();
-
-                // Handle pairing code generation
-                if (choice === '2') {
-                    const generatePairingCode = async () => {
-                        try {
-                            const code = await sock.requestPairingCode(number);
-                            console.clear();
-                            console.log(`
-╭━━━━━━━━━━━━━━━━━━━━━╮
-┃   PAIRING CODE       ┃
-┃━━━━━━━━━━━━━━━━━━━━━┃
-┃ Code: ${code}        ┃
-╰━━━━━━━━━━━━━━━━━━━━━╯`);
-                        } catch (error) {
-                            console.error('\nFailed to generate pairing code:', error.message);
-                            if (pairingRetries < maxRetries) {
-                                pairingRetries++;
-                                console.log(`\nRetrying to generate pairing code... (${pairingRetries}/${maxRetries})`);
-                                setTimeout(generatePairingCode, 3000);
-                            } else {
-                                console.log('\nMax retries reached. Please restart the bot.');
-                                process.exit(1);
-                            }
-                        }
-                    };
-
-                    setTimeout(generatePairingCode, 3000);
-                }
-
-            } catch (error) {
-                console.error('Error starting bot:', error);
-                process.exit(1);
+        if (connection === 'close') {
+            const shouldReconnect = (lastDisconnect?.error instanceof Boom)?.output?.statusCode !== DisconnectReason.loggedOut
+            
+            console.log('Connection closed due to:', lastDisconnect?.error?.message)
+            
+            if (shouldReconnect) {
+                start()
             }
-        });
-    });
+        } else if (connection === 'open') {
+            console.log('Connected!')
+        }
+    })
+
+    sock.ev.on('messages.upsert', m => {
+        console.log(JSON.stringify(m, undefined, 2))
+    })
+
+    // Handle pairing code
+    if (!sock.authState.creds.registered) {
+        rl.question('Enter your phone number (with country code): ', async (number) => {
+            const code = await sock.requestPairingCode(number)
+            console.log(`Pairing code: ${code}`)
+        })
+    }
 }
 
-startBot();
+start()
