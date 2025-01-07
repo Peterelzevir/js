@@ -1,24 +1,24 @@
-// Import modules
-import makeWASocket, {
+const {
+    default: makeWASocket,
     useMultiFileAuthState,
     DisconnectReason,
     jidDecode,
     downloadContentFromMessage,
     getContentType,
     generateWAMessageFromContent,
-    proto,
-} from '@whiskeysockets/baileys';
-import pino from 'pino';
-import { Boom } from '@hapi/boom';
-import fs from 'fs';
-import * as FileType from 'file-type';
-import path from 'path';
-import { exec } from 'child_process';
-import axios from 'axios';
-import readline from 'readline';
-import ffmpeg from 'fluent-ffmpeg';
-import { removeBackgroundFromImageUrl } from 'remove.bg';
-import Jimp from 'jimp';
+    proto
+} = require('@whiskeysockets/baileys')
+const pino = require('pino')
+const { Boom } = require('@hapi/boom')
+const fs = require('fs')
+const FileType = require('file-type')
+const path = require('path')
+const { exec } = require('child_process')
+const axios = require('axios')
+const readline = require('readline')
+const ffmpeg = require('fluent-ffmpeg')
+const { removeBackgroundFromImageUrl } = require('remove.bg')
+const Jimp = require('jimp')
 
 // Constants
 const WATERMARK = '\n\n_Powered by @hiyaok on Telegram_'
