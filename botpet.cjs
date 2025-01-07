@@ -11,7 +11,7 @@ import makeWASocket, {
 import pino from 'pino';
 import { Boom } from '@hapi/boom';
 import fs from 'fs';
-import FileType from 'file-type';
+import * as FileType from 'file-type';
 import path from 'path';
 import { exec } from 'child_process';
 import axios from 'axios';
