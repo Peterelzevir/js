@@ -452,6 +452,29 @@ const messageHandler = (sock) => async ({ messages }) => {
     }
 }
 
+// Helper function for clone connection handling
+const handleCloneConnection = async (connection, cloneSock, sock, from, number, sessionPath, processingMsg) => {
+    if (connection === 'open') {
+        await sock.sendMessage(from, { 
+            text: `${CLONE_ASCII}\n\n*✅ ${BOT_NAME} clone connected successfully!*\n\n*Number:* ${number}\n*Status:* Online\n\n_All features are ready to use._${WATERMARK}`,
+            edit: processingMsg.key 
+        })
+    } else if (connection === 'close') {
+        const shouldReconnect = (cloneSock.lastDisconnect?.error instanceof Boom)?.output?.statusCode !== DisconnectReason.loggedOut
+        
+        if (shouldReconnect) {
+            await sock.sendMessage(from, { 
+                text: `${CLONE_ASCII}\n\n*⚠️ Clone connection lost, reconnecting...*` + WATERMARK 
+            })
+        } else {
+            await sock.sendMessage(from, { 
+                text: `${CLONE_ASCII}\n\n*❌ Clone session ended*` + WATERMARK 
+            })
+            fs.rmSync(sessionPath, { recursive: true, force: true })
+        }
+    }
+}
+
 // Start Bot Function
 async function startBot() {
     console.log(ASCII_ART)
@@ -461,29 +484,30 @@ async function startBot() {
         console.log('\nProcessing...')
         
         rl.question('\nChoose login method:\n1. QR Code\n2. Pairing Code\nEnter choice (1/2): ', async (choice) => {
-            const { state, saveCreds } = await useMultiFileAuthState(path.join(SESSION_DIR, 'main-bot'))
-            
-            const sock = makeWASocket({
-                printQRInTerminal: choice === '1',
-                auth: state,
-                logger: pino({ level: 'silent' }),
-                browser: [BOT_NAME, 'Safari', '']
-            })
+            try {
+                const { state, saveCreds } = await useMultiFileAuthState(path.join(SESSION_DIR, 'main-bot'))
+                
+                const sock = makeWASocket({
+                    printQRInTerminal: true, // Always enable QR printing
+                    auth: state,
+                    logger: pino({ level: 'silent' }),
+                    browser: [BOT_NAME, 'Safari', '']
+                })
 
-            // Connection Update Handler
-            sock.ev.on('connection.update', async ({ connection, lastDisconnect, qr }) => {
-                if(connection === 'close') {
-                    const shouldReconnect = (lastDisconnect?.error instanceof Boom)?.output?.statusCode !== DisconnectReason.loggedOut
-                    
-                    if(shouldReconnect) {
-                        console.log('Connection lost, reconnecting...')
-                        startBot()
-                    } else {
-                        console.log('Connection closed. You are logged out.')
-                        process.exit(0)
-                    }
-                } else if(connection === 'open') {
-                    console.log(`
+                // Connection Update Handler
+                sock.ev.on('connection.update', async ({ connection, lastDisconnect, qr }) => {
+                    if(connection === 'close') {
+                        const shouldReconnect = (lastDisconnect?.error instanceof Boom)?.output?.statusCode !== DisconnectReason.loggedOut
+                        
+                        if(shouldReconnect) {
+                            console.log('Connection lost, reconnecting...')
+                            startBot()
+                        } else {
+                            console.log('Connection closed. You are logged out.')
+                            process.exit(0)
+                        }
+                    } else if(connection === 'open') {
+                        console.log(`
 ╭━━━━━━━━━━━━━━━━━━━━━╮
 ┃   PINEMARK CONNECTED! ┃
 ┃━━━━━━━━━━━━━━━━━━━━━┃
@@ -492,40 +516,42 @@ async function startBot() {
 ┃ Name   : ${BOT_NAME} ┃
 ╰━━━━━━━━━━━━━━━━━━━━━╯
 `)
-                }
-                
-                if(qr && choice === '1') {
-                    console.log('Scan this QR code:')
-                } else if(choice === '2') {
-                    try {
-                        const pairingCode = await sock.requestPairingCode(number)
-                        console.log(`
+                    }
+                    
+                    // Handle QR code generation
+                    if(choice === '1' && qr) {
+                        console.log('Scan this QR code to login:')
+                    } 
+                })
+
+                // Generate pairing code if selected
+                if(choice === '2') {
+                    setTimeout(async () => {
+                        try {
+                            const code = await sock.requestPairingCode(number)
+                            console.log(`
 ╭━━━━━━━━━━━━━━━━━━━━━╮
 ┃   PAIRING CODE       ┃
 ┃━━━━━━━━━━━━━━━━━━━━━┃
-┃ Code: ${pairingCode} ┃
+┃ Code: ${code}        ┃
 ╰━━━━━━━━━━━━━━━━━━━━━╯
 `)
-                    } catch (error) {
-                        console.error('Failed to generate pairing code:', error)
-                        process.exit(1)
-                    }
+                        } catch (error) {
+                            console.error('Failed to generate pairing code:', error)
+                        }
+                    }, 3000) // Add delay to ensure connection is ready
                 }
-            })
 
-            // Credentials Update Handler
-            sock.ev.on('creds.update', saveCreds)
+                // Credentials Update Handler
+                sock.ev.on('creds.update', saveCreds)
 
-            // Message Handler
-            sock.ev.on('messages.upsert', messageHandler(sock))
+                // Message Handler
+                sock.ev.on('messages.upsert', messageHandler(sock))
 
-            // Error Handler
-            sock.ev.on('error', async (error) => {
-                console.error('Socket error:', error)
-                await sock.sendMessage(from, {
-                    text: `*❌ ${BOT_NAME} connection error occurred*` + WATERMARK
-                })
-            })
+            } catch (error) {
+                console.error('Error starting bot:', error)
+                process.exit(1)
+            }
         })
     })
 }
