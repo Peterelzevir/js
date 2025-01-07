@@ -35,6 +35,15 @@ const ASCII_ART = `
 ║        WhatsApp Bot Pine        ║
 ╚═════════════════════════════════════╝`
 
+const CLONE_ASCII = `
+╔════════════════════════════════════╗
+║     ╔═╗╦  ╔═╗╔╗╔╔═╗  ╔╗ ╔═╗╔╦╗    ║
+║     ║  ║  ║ ║║║║║╣   ╠╩╗║ ║ ║     ║
+║     ╚═╝╩═╝╚═╝╝╚╝╚═╝  ╚═╝╚═╝ ╩     ║
+║                                    ║
+║      Clone Session Manager         ║
+╚════════════════════════════════════╝`
+
 // Create directories
 if (!fs.existsSync(SESSION_DIR)) fs.mkdirSync(SESSION_DIR)
 if (!fs.existsSync(TEMP_DIR)) fs.mkdirSync(TEMP_DIR)
@@ -75,6 +84,16 @@ const sendButton = async (sock, jid, text, buttons) => {
             }
         })
     }
+}
+
+const sendPoll = async (sock, jid, text, options) => {
+    return await sock.sendMessage(jid, {
+        poll: {
+            name: text,
+            values: options,
+            selectableCount: 1
+        }
+    })
 }
 
 const downloadMedia = async (message, type) => {
@@ -125,7 +144,7 @@ const helpMenu = `${ASCII_ART}
 • Auto AI response for text messages
 • Auto background removal for images
 
-Made with ❤️ by Pinemark Team${WATERMARK}`
+Made with ❤️ by Pinemark Team ${WATERMARK}`
 
 // Message Handler
 const messageHandler = (sock) => async ({ messages }) => {
@@ -163,7 +182,7 @@ const messageHandler = (sock) => async ({ messages }) => {
             }
 
             const processingMsg = await sock.sendMessage(from, { 
-                text: `*🤖 Initializing ${BOT_NAME} clone process...*` + WATERMARK 
+                text: `${CLONE_ASCII}\n\n*🤖 Initializing ${BOT_NAME} clone process...*` + WATERMARK 
             })
 
             try {
@@ -177,39 +196,53 @@ const messageHandler = (sock) => async ({ messages }) => {
                     browser: [`${BOT_NAME} Clone`, 'Safari', '']
                 })
 
-                // Send login options
-                await sendButton(sock, from, '*Choose login method:*', [
-                    { id: 'qr', text: 'QR Code' },
-                    { id: 'pair', text: 'Pairing Code' },
-                    { id: 'cancel', text: 'Cancel' }
-                ])
+                // Send login method poll
+                await sendPoll(sock, from, 
+                    `${CLONE_ASCII}\n\n*Choose login method for clone:*`,
+                    ['QR Code', 'Pairing Code', 'Cancel']
+                )
 
-                cloneSock.ev.on('connection.update', async ({ connection, lastDisconnect, qr }) => {
-                    if (connection === 'open') {
-                        await sock.sendMessage(from, { 
-                            text: `*✅ ${BOT_NAME} clone connected successfully!*\n\n*Number:* ${args[0]}\n*Status:* Online\n\n_All features are ready to use._${WATERMARK}`,
-                            edit: processingMsg.key 
-                        })
-                    } else if (connection === 'close') {
-                        const shouldReconnect = (lastDisconnect?.error instanceof Boom)?.output?.statusCode !== DisconnectReason.loggedOut
+                // Handle poll response
+                sock.ev.on('messages.upsert', async ({ messages }) => {
+                    const pollMsg = messages[0]
+                    if (pollMsg.message?.pollUpdateMessage) {
+                        const selectedOption = pollMsg.message.pollUpdateMessage.vote
                         
-                        if (shouldReconnect) {
-                            await sock.sendMessage(from, { 
-                                text: '*⚠️ Clone connection lost, reconnecting...*' + WATERMARK 
+                        if (selectedOption === 'QR Code') {
+                            cloneSock.ev.on('connection.update', async ({ connection, qr }) => {
+                                if (qr) {
+                                    await sock.sendMessage(from, {
+                                        image: Buffer.from(qr, 'base64'),
+                                        caption: `${CLONE_ASCII}\n\n*🔄 Scan this QR Code to login*\n\nQR Code will expire in 60 seconds.${WATERMARK}`
+                                    })
+                                }
+                                handleCloneConnection(connection, cloneSock, sock, from, args[0], sessionPath, processingMsg)
                             })
-                        } else {
-                            await sock.sendMessage(from, { 
-                                text: '*❌ Clone session ended*' + WATERMARK 
+                        } 
+                        else if (selectedOption === 'Pairing Code') {
+                            try {
+                                const pairingCode = await cloneSock.requestPairingCode(args[0])
+                                await sock.sendMessage(from, {
+                                    text: `${CLONE_ASCII}\n\n*🔑 Your pairing code:*\n\n${pairingCode}${WATERMARK}`
+                                })
+                                
+                                cloneSock.ev.on('connection.update', ({ connection }) => {
+                                    handleCloneConnection(connection, cloneSock, sock, from, args[0], sessionPath, processingMsg)
+                                })
+                            } catch (error) {
+                                console.error('Pairing code error:', error)
+                                await sock.sendMessage(from, {
+                                    text: `${CLONE_ASCII}\n\n*❌ Failed to generate pairing code*` + WATERMARK
+                                })
+                            }
+                        }
+                        else if (selectedOption === 'Cancel') {
+                            await sock.sendMessage(from, {
+                                text: `${CLONE_ASCII}\n\n*❌ Clone process cancelled*` + WATERMARK,
+                                edit: processingMsg.key
                             })
                             fs.rmSync(sessionPath, { recursive: true, force: true })
                         }
-                    }
-
-                    if (qr) {
-                        await sock.sendMessage(from, {
-                            image: Buffer.from(qr, 'base64'),
-                            caption: `*🔄 Scan this QR Code to login*\n\nQR Code will expire in 60 seconds.${WATERMARK}`
-                        })
                     }
                 })
 
@@ -219,7 +252,7 @@ const messageHandler = (sock) => async ({ messages }) => {
             } catch (error) {
                 console.error('Clone error:', error)
                 await sock.sendMessage(from, { 
-                    text: '*❌ Failed to initialize clone*' + WATERMARK,
+                    text: `${CLONE_ASCII}\n\n*❌ Failed to initialize clone*` + WATERMARK,
                     edit: processingMsg.key 
                 })
             }
