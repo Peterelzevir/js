@@ -486,27 +486,41 @@ async function startBot() {
         
         rl.question('\nChoose login method:\n1. QR Code\n2. Pairing Code\nEnter choice (1/2): ', async (choice) => {
             try {
+                // Pastikan direktori session ada
+                if (!fs.existsSync(SESSION_DIR)) {
+                    fs.mkdirSync(SESSION_DIR, { recursive: true })
+                }
+                
                 const { state, saveCreds } = await useMultiFileAuthState(path.join(SESSION_DIR, 'main-bot'))
                 
                 const sock = makeWASocket({
-                    printQRInTerminal: true,
                     auth: state,
-                    logger: pino({ level: 'silent' }),
-                    browser: [BOT_NAME, 'Safari', '']
+                    printQRInTerminal: true,
+                    logger: pino({ level: 'silent' }), // Kita set silent dulu
+                    browser: ['Pinemark Bot', 'Chrome', '4.0.0'], // Browser yang stabil
+                    version: [2, 2308, 7] // Versi stabil
                 })
 
-                // Connection Update Handler
-                sock.ev.on('connection.update', async ({ connection, lastDisconnect, qr }) => {
+                // Connection Update Handler               
+                sock.ev.on('connection.update', (update) => {
+                    const { connection, lastDisconnect, qr } = update
+                    
+                    // QR Code Handler
+                    if(choice === '1' && qr) {
+                        console.log('Scan QR code to connect!')
+                    }
+
+                    // Connection Handler
+                    if(connection) {
+                        console.log('Connection Status:', connection)
+                    }
+                    
+                    // Handle specific connection states
                     if(connection === 'close') {
-                        const statusCode = (lastDisconnect?.error instanceof Boom)?.output?.statusCode
-                        console.log('Connection closed with status:', statusCode)
-                        
-                        if(statusCode !== DisconnectReason.loggedOut) {
-                            console.log('Attempting to reconnect...')
+                        const shouldReconnect = (lastDisconnect?.error)?.output?.statusCode !== DisconnectReason.loggedOut                        
+                        if(shouldReconnect) {
+                            console.log('Reconnecting...')
                             startBot()
-                        } else {
-                            console.log('Logged out, stopping bot')
-                            process.exit(0)
                         }
                     } else if(connection === 'open') {
                         console.log(`
@@ -518,26 +532,19 @@ async function startBot() {
 ┃ Name   : ${BOT_NAME} ┃
 ╰━━━━━━━━━━━━━━━━━━━━━╯
 `)
-                        // Generate pairing code setelah koneksi terbuka
+                        // Handle pairing code after connection established
                         if(choice === '2') {
-                            try {
-                                const code = await sock.requestPairingCode(number)
-                                console.log(`
+                            sock.requestPairingCode(number)
+                                .then(code => {
+                                    console.log(`
 ╭━━━━━━━━━━━━━━━━━━━━━╮
 ┃   PAIRING CODE       ┃
 ┃━━━━━━━━━━━━━━━━━━━━━┃
 ┃ Code: ${code}        ┃
 ╰━━━━━━━━━━━━━━━━━━━━━╯
 `)
-                            } catch (error) {
-                                console.error('Failed to generate pairing code:', error)
-                            }
+                                })
                         }
-                    }
-                    
-                    // Handle QR code generation
-                    if(choice === '1' && qr) {
-                        console.log('QR Code received, please scan:')
                     }
                 })
 
@@ -548,7 +555,7 @@ async function startBot() {
                 sock.ev.on('messages.upsert', messageHandler(sock))
 
             } catch (error) {
-                console.error('Error starting bot:', error)
+                console.error('Error:', error)
                 process.exit(1)
             }
         })
