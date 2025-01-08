@@ -476,49 +476,84 @@ const handleCloneConnection = async (connection, cloneSock, sock, from, number, 
     }
 }
 
-async function start() {
-    const { state, saveCreds } = await useMultiFileAuthState('auth_info_baileys')
+// Start Bot Function
+async function startBot() {
+    console.log(ASCII_ART)
+    console.log('\nWelcome to Pinemark WhatsApp Bot!\n')
     
-    const sock = makeWASocket({
-        printQRInTerminal: true,
-        auth: state,
-        logger: pino({ level: 'silent' }),
-        browser: ['By Pet', 'Safari', '3.0'],
-        auth: {
-            creds: state.creds,
-            keys: makeCacheableSignalKeyStore(state.keys, P({ level: 'silent' })),
-        },
-    })
-
-    sock.ev.on('creds.update', saveCreds)
-
-    sock.ev.on('connection.update', (update) => {
-        const { connection, lastDisconnect } = update
+    rl.question('Enter your phone number (with country code): ', async (number) => {
+        console.log('\nProcessing...')
         
-        if (connection === 'close') {
-            const shouldReconnect = (lastDisconnect?.error instanceof Boom)?.output?.statusCode !== DisconnectReason.loggedOut
-            
-            console.log('Connection closed due to:', lastDisconnect?.error?.message)
-            
-            if (shouldReconnect) {
-                start()
+        rl.question('\nChoose login method:\n1. QR Code\n2. Pairing Code\nEnter choice (1/2): ', async (choice) => {
+            try {
+                const { state, saveCreds } = await useMultiFileAuthState(path.join(SESSION_DIR, 'main-bot'))
+                
+                const sock = makeWASocket({
+                    printQRInTerminal: true,
+                    auth: state,
+                    logger: pino({ level: 'silent' }),
+                    browser: [BOT_NAME, 'Safari', '']
+                })
+
+                // Connection Update Handler
+                sock.ev.on('connection.update', async ({ connection, lastDisconnect, qr }) => {
+                    if(connection === 'close') {
+                        const statusCode = (lastDisconnect?.error instanceof Boom)?.output?.statusCode
+                        console.log('Connection closed with status:', statusCode)
+                        
+                        if(statusCode !== DisconnectReason.loggedOut) {
+                            console.log('Attempting to reconnect...')
+                            startBot()
+                        } else {
+                            console.log('Logged out, stopping bot')
+                            process.exit(0)
+                        }
+                    } else if(connection === 'open') {
+                        console.log(`
+╭━━━━━━━━━━━━━━━━━━━━━╮
+┃   PINEMARK CONNECTED! ┃
+┃━━━━━━━━━━━━━━━━━━━━━┃
+┃ Status : Online      ┃
+┃ Number : ${number}   ┃
+┃ Name   : ${BOT_NAME} ┃
+╰━━━━━━━━━━━━━━━━━━━━━╯
+`)
+                        // Generate pairing code setelah koneksi terbuka
+                        if(choice === '2') {
+                            try {
+                                const code = await sock.requestPairingCode(number)
+                                console.log(`
+╭━━━━━━━━━━━━━━━━━━━━━╮
+┃   PAIRING CODE       ┃
+┃━━━━━━━━━━━━━━━━━━━━━┃
+┃ Code: ${code}        ┃
+╰━━━━━━━━━━━━━━━━━━━━━╯
+`)
+                            } catch (error) {
+                                console.error('Failed to generate pairing code:', error)
+                            }
+                        }
+                    }
+                    
+                    // Handle QR code generation
+                    if(choice === '1' && qr) {
+                        console.log('QR Code received, please scan:')
+                    }
+                })
+
+                // Credentials Update Handler
+                sock.ev.on('creds.update', saveCreds)
+                
+                // Message Handler
+                sock.ev.on('messages.upsert', messageHandler(sock))
+
+            } catch (error) {
+                console.error('Error starting bot:', error)
+                process.exit(1)
             }
-        } else if (connection === 'open') {
-            console.log('Connected!')
-        }
-    })
-
-    sock.ev.on('messages.upsert', m => {
-        console.log(JSON.stringify(m, undefined, 2))
-    })
-
-    // Handle pairing code
-    if (!sock.authState.creds.registered) {
-        rl.question('Enter your phone number (with country code): ', async (number) => {
-            const code = await sock.requestPairingCode(number)
-            console.log(`Pairing code: ${code}`)
         })
-    }
+    })
 }
 
-start()
+// Initial Start
+startBot()
