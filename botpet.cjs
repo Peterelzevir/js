@@ -486,44 +486,45 @@ async function startBot() {
         
         rl.question('\nChoose login method:\n1. QR Code\n2. Pairing Code\nEnter choice (1/2): ', async (choice) => {
             try {
-                // Pastikan direktori session ada
                 if (!fs.existsSync(SESSION_DIR)) {
                     fs.mkdirSync(SESSION_DIR, { recursive: true })
                 }
                 
                 const { state, saveCreds } = await useMultiFileAuthState(path.join(SESSION_DIR, 'main-bot'))
                 
-                const sock = makeWASocket({
-                    auth: state,
-                    printQRInTerminal: true,
-                    logger: pino({ level: 'silent' }), // Kita set silent dulu
-                    browser: ['Pinemark Bot', 'Chrome', '4.0.0'], // Browser yang stabil
-                    version: [2, 2308, 7] // Versi stabil
-                })
+                let connectionAttempts = 0
+                const startConnection = async () => {
+                    const sock = makeWASocket({
+                        auth: state,
+                        printQRInTerminal: true,
+                        logger: pino({ level: 'silent' }),
+                        browser: ['Pinemark Bot', 'Chrome', '4.0.0'],
+                        version: [2, 2308, 7]
+                    })
 
-                // Connection Update Handler               
-                sock.ev.on('connection.update', (update) => {
-                    const { connection, lastDisconnect, qr } = update
-                    
-                    // QR Code Handler
-                    if(choice === '1' && qr) {
-                        console.log('Scan QR code to connect!')
-                    }
-
-                    // Connection Handler
-                    if(connection) {
-                        console.log('Connection Status:', connection)
-                    }
-                    
-                    // Handle specific connection states
-                    if(connection === 'close') {
-                        const shouldReconnect = (lastDisconnect?.error)?.output?.statusCode !== DisconnectReason.loggedOut                        
-                        if(shouldReconnect) {
-                            console.log('Reconnecting...')
-                            startBot()
+                    sock.ev.on('connection.update', async (update) => {
+                        const { connection, lastDisconnect, qr } = update
+                        
+                        if(choice === '1' && qr) {
+                            console.log('Scan QR code to connect!')
                         }
-                    } else if(connection === 'open') {
-                        console.log(`
+
+                        if(connection === 'connecting') {
+                            console.log('Connecting to WhatsApp...')
+                        } else if(connection === 'close') {
+                            const statusCode = lastDisconnect?.error?.output?.statusCode
+                            console.log('Connection closed. Status code:', statusCode)
+                            
+                            if(statusCode !== DisconnectReason.loggedOut && connectionAttempts < 3) {
+                                connectionAttempts++
+                                console.log(`Reconnection attempt ${connectionAttempts}/3...`)
+                                setTimeout(startConnection, 3000)
+                            } else {
+                                console.log('Max reconnection attempts reached or logged out')
+                                process.exit(1)
+                            }
+                        } else if(connection === 'open') {
+                            console.log(`
 ╭━━━━━━━━━━━━━━━━━━━━━╮
 ┃   PINEMARK CONNECTED! ┃
 ┃━━━━━━━━━━━━━━━━━━━━━┃
@@ -532,10 +533,9 @@ async function startBot() {
 ┃ Name   : ${BOT_NAME} ┃
 ╰━━━━━━━━━━━━━━━━━━━━━╯
 `)
-                        // Handle pairing code after connection established
-                        if(choice === '2') {
-                            sock.requestPairingCode(number)
-                                .then(code => {
+                            if(choice === '2') {
+                                try {
+                                    const code = await sock.requestPairingCode(number)
                                     console.log(`
 ╭━━━━━━━━━━━━━━━━━━━━━╮
 ┃   PAIRING CODE       ┃
@@ -543,19 +543,22 @@ async function startBot() {
 ┃ Code: ${code}        ┃
 ╰━━━━━━━━━━━━━━━━━━━━━╯
 `)
-                                })
+                                } catch (err) {
+                                    console.error('Failed to get pairing code:', err)
+                                }
+                            }
                         }
-                    }
-                })
+                    })
 
-                // Credentials Update Handler
-                sock.ev.on('creds.update', saveCreds)
-                
-                // Message Handler
-                sock.ev.on('messages.upsert', messageHandler(sock))
+                    sock.ev.on('creds.update', saveCreds)
+                    sock.ev.on('messages.upsert', messageHandler(sock))
+                }
+
+                // Start initial connection
+                await startConnection()
 
             } catch (error) {
-                console.error('Error:', error)
+                console.error('Fatal error:', error)
                 process.exit(1)
             }
         })
