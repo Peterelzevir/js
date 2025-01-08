@@ -480,51 +480,57 @@ const handleCloneConnection = async (connection, cloneSock, sock, from, number, 
 async function startBot() {
     console.log(ASCII_ART)
     console.log('\nWelcome to Pinemark WhatsApp Bot!\n')
-    
+
     rl.question('Enter your phone number (with country code): ', async (number) => {
         console.log('\nProcessing...')
-        
+
         rl.question('\nChoose login method:\n1. QR Code\n2. Pairing Code\nEnter choice (1/2): ', async (choice) => {
             try {
                 if (!fs.existsSync(SESSION_DIR)) {
                     fs.mkdirSync(SESSION_DIR, { recursive: true })
                 }
-                
+
                 const { state, saveCreds } = await useMultiFileAuthState(path.join(SESSION_DIR, 'main-bot'))
-                
+
                 let connectionAttempts = 0
                 const startConnection = async () => {
                     const sock = makeWASocket({
                         auth: state,
                         printQRInTerminal: true,
-                        logger: pino({ level: 'silent' }),
+                        logger: pino({ level: 'debug' }), // Ubah log level ke 'debug'
                         browser: ['Pinemark Bot', 'Chrome', '4.0.0'],
                         version: [2, 2308, 7]
                     })
 
                     sock.ev.on('connection.update', async (update) => {
-                        const { connection, lastDisconnect, qr } = update
-                        
-                        if(choice === '1' && qr) {
-                            console.log('Scan QR code to connect!')
-                        }
+                        try {
+                            const { connection, lastDisconnect, qr } = update
 
-                        if(connection === 'connecting') {
-                            console.log('Connecting to WhatsApp...')
-                        } else if(connection === 'close') {
-                            const statusCode = lastDisconnect?.error?.output?.statusCode
-                            console.log('Connection closed. Status code:', statusCode)
-                            
-                            if(statusCode !== DisconnectReason.loggedOut && connectionAttempts < 3) {
-                                connectionAttempts++
-                                console.log(`Reconnection attempt ${connectionAttempts}/3...`)
-                                setTimeout(startConnection, 3000)
-                            } else {
-                                console.log('Max reconnection attempts reached or logged out')
-                                process.exit(1)
+                            if (choice === '1' && qr) {
+                                console.log('Scan QR code to connect!')
                             }
-                        } else if(connection === 'open') {
-                            console.log(`
+
+                            if (connection === 'connecting') {
+                                console.log('Connecting to WhatsApp...')
+                            } else if (connection === 'close') {
+                                const statusCode = lastDisconnect?.error?.output?.statusCode
+                                const errorDetails = lastDisconnect?.error
+
+                                console.error('Connection closed. Status code:', statusCode)
+                                if (errorDetails) {
+                                    console.error('Detailed error:', errorDetails)
+                                }
+
+                                if (statusCode !== DisconnectReason.loggedOut && connectionAttempts < 3) {
+                                    connectionAttempts++
+                                    console.log(`Reconnection attempt ${connectionAttempts}/3...`)
+                                    setTimeout(startConnection, 3000)
+                                } else {
+                                    console.error('Max reconnection attempts reached or logged out.')
+                                    process.exit(1)
+                                }
+                            } else if (connection === 'open') {
+                                console.log(`
 ╭━━━━━━━━━━━━━━━━━━━━━╮
 ┃   PINEMARK CONNECTED! ┃
 ┃━━━━━━━━━━━━━━━━━━━━━┃
@@ -533,20 +539,23 @@ async function startBot() {
 ┃ Name   : ${BOT_NAME} ┃
 ╰━━━━━━━━━━━━━━━━━━━━━╯
 `)
-                            if(choice === '2') {
-                                try {
-                                    const code = await sock.requestPairingCode(number)
-                                    console.log(`
+                                if (choice === '2') {
+                                    try {
+                                        const code = await sock.requestPairingCode(number)
+                                        console.log(`
 ╭━━━━━━━━━━━━━━━━━━━━━╮
 ┃   PAIRING CODE       ┃
 ┃━━━━━━━━━━━━━━━━━━━━━┃
 ┃ Code: ${code}        ┃
 ╰━━━━━━━━━━━━━━━━━━━━━╯
 `)
-                                } catch (err) {
-                                    console.error('Failed to get pairing code:', err)
+                                    } catch (err) {
+                                        console.error('Failed to get pairing code:', err)
+                                    }
                                 }
                             }
+                        } catch (err) {
+                            console.error('Error during connection update:', err)
                         }
                     })
 
@@ -558,7 +567,8 @@ async function startBot() {
                 await startConnection()
 
             } catch (error) {
-                console.error('Fatal error:', error)
+                console.error('Fatal error occurred:', error.message)
+                console.error('Stack trace:', error.stack)
                 process.exit(1)
             }
         })
