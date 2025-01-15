@@ -8,7 +8,7 @@ const axios = require('axios');
 const bot = new TelegramBot('8094891737:AAEelXMr4G1YzEaeQv5c3UNX7fnS9e9pS2w', { polling: true });
 
 const userStates = {};
-const ADMIN_ID = '6629667163'; // Replace with your admin's Telegram ID
+const ADMIN_ID = '6412509091'; // Replace with your admin's Telegram ID
 
 // Function to send formatted message
 function sendFormattedMessage(chatId, text) {
